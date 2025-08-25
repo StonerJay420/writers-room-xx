@@ -1,6 +1,4 @@
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? '/api' 
-  : 'http://0.0.0.0:8000/api'
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || ''
 
 class ApiClient {
   private baseURL: string
@@ -79,4 +77,4 @@ class ApiClient {
   }
 }
 
-export const api = new ApiClient(API_BASE_URL)
+export const api = new ApiClient(API_BASE)
