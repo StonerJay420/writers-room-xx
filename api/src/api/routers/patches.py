@@ -10,18 +10,20 @@ import uuid
 from ..db import get_write_session, get_read_session
 from ..models import Scene, Job, Artifact
 from ..services.ai_service import ai_service
+from ..services.agent_service import agent_service
+from ..services.job_queue import job_queue
 from ..routers.models import model_preferences
 
 
 router = APIRouter(prefix="/patches", tags=["patches"])
 
 
-class AgentPassRequest(BaseModel):
-    """Request to run agents on a scene."""
+class PatchRequest(BaseModel):
+    """Request to generate patches for a scene."""
     scene_id: str
     agents: List[str] = ["lore_archivist", "grim_editor"]
-    custom_models: Optional[Dict[str, str]] = None  # Agent name -> model ID
     variants: List[str] = ["safe", "bold"]
+    custom_instructions: Optional[str] = None
 
 
 class PatchResponse(BaseModel):
@@ -45,105 +47,55 @@ class JobStatus(BaseModel):
 
 @router.post("/generate", response_model=PatchResponse)
 async def generate_patches(
-    request: AgentPassRequest,
-    background_tasks: BackgroundTasks,
+    request: PatchRequest,
     db: Session = Depends(get_write_session)
 ):
-    """Generate patches for a scene using specified agents."""
+    """Generate patches for a scene using AI agents."""
     
-    # Verify scene exists
     scene = db.query(Scene).filter(Scene.id == request.scene_id).first()
     if not scene:
-        raise HTTPException(status_code=404, detail=f"Scene {request.scene_id} not found")
+        raise HTTPException(status_code=404, detail="Scene not found")
     
-    # Read scene text
-    scene_text = ""
-    if scene.text_path:
-        try:
-            with open(scene.text_path, 'r') as f:
-                content = f.read()
-                # Remove front matter if present
-                if content.startswith('---'):
-                    parts = content.split('---', 2)
-                    if len(parts) >= 3:
-                        scene_text = parts[2].strip()
-                else:
-                    scene_text = content
-        except:
-            raise HTTPException(status_code=500, detail="Could not read scene text")
-    
-    # Create job
-    job = Job(
-        id=str(uuid.uuid4()),
-        scene_id=request.scene_id,
-        status="running",
-        agents_json={"agents": request.agents, "variants": request.variants}
-    )
-    db.add(job)
-    db.commit()
-    
-    # Process with agents
-    patches = []
-    total_cost = 0.0
-    
-    for agent_name in request.agents:
-        # Get custom model if specified
-        custom_model = None
-        if request.custom_models and agent_name in request.custom_models:
-            custom_model = request.custom_models[agent_name]
-        
-        # Call agent
-        result = await ai_service.call_agent(
-            agent_name=agent_name,
-            prompt=f"Analyze this scene and provide specific editing suggestions.",
-            scene_text=scene_text,
-            custom_model=custom_model
+    try:
+        # Process with agent service
+        result = await agent_service.process_scene(
+            request.scene_id,
+            request.variants,
+            request.custom_instructions
         )
         
-        if "error" in result:
-            continue
-        
-        # Create artifacts for each variant
-        for variant in request.variants:
-            artifact = Artifact(
-                id=str(uuid.uuid4()),
-                scene_id=request.scene_id,
-                variant=variant,
-                diff_key=f"diffs/{job.id}/{agent_name}_{variant}.diff",
-                metrics_before={},
-                metrics_after={},
-                receipts_json={
-                    "agent": agent_name,
-                    "model": result.get("model"),
-                    "cost": result.get("cost_usd", 0),
-                    "timestamp": result.get("timestamp")
-                }
-            )
-            db.add(artifact)
+        # Convert agent results to patches format
+        patches = []
+        for variant in result["variants"]:
+            variant_data = {
+                "variant": variant["variant_name"],
+                "agents": [],
+                "final_text": variant["final_text"],
+                "improvement_score": variant["improvement_score"],
+                "total_changes": variant["total_changes"]
+            }
             
-            patches.append({
-                "agent": agent_name,
-                "variant": variant,
-                "suggestions": result.get("response"),
-                "model_used": result.get("model"),
-                "cost": result.get("cost_usd", 0)
-            })
+            for agent_result in variant["agent_results"]:
+                variant_data["agents"].append({
+                    "name": agent_result.agent_name,
+                    "model": agent_result.model_id,
+                    "confidence": agent_result.confidence_score,
+                    "reasoning": agent_result.reasoning,
+                    "cost": agent_result.cost_usd
+                })
+            
+            patches.append(variant_data)
         
-        total_cost += result.get("cost_usd", 0)
-    
-    # Update job status
-    job.status = "done"
-    job.result_json = {"patches": patches, "total_cost": total_cost}
-    job.updated_at = datetime.utcnow()
-    db.commit()
-    
-    return PatchResponse(
-        job_id=job.id,
-        scene_id=request.scene_id,
-        status="completed",
-        patches=patches,
-        cost_usd=total_cost
-    )
+        return PatchResponse(
+            job_id=result["job_id"],
+            scene_id=request.scene_id,
+            status="completed",
+            patches=patches,
+            cost_usd=result["total_cost"]
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/jobs/{job_id}", response_model=JobStatus)

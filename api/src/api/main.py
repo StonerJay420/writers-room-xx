@@ -57,6 +57,7 @@ from .routers.models import router as models_router
 from .routers.patches import router as patches_router
 from .routers.reports import router as reports_router
 from .routers.search import router as search_router
+from .routers.diff import router as diff_router
 
 # Include routers
 app.include_router(ingest_router, prefix="/api")
@@ -65,3 +66,4 @@ app.include_router(models_router, prefix="/api")
 app.include_router(patches_router, prefix="/api")
 app.include_router(reports_router, prefix="/api")
 app.include_router(search_router, prefix="/api")
+app.include_router(diff_router, prefix="/api")
