@@ -182,3 +182,82 @@ async def set_agent_model(config: AgentModelConfig):
         raise HTTPException(status_code=400, detail=f"Unknown agent: {config.agent_name}")
     
     return {"status": "updated", "agent": config.agent_name, "model": config.model_id}
+"""Models and agent configuration router."""
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from typing import Dict, List
+import json
+from pathlib import Path
+
+router = APIRouter(prefix="/models", tags=["models"])
+
+
+class AgentConfigRequest(BaseModel):
+    agent_name: str
+    model_id: str
+
+
+class ModelPreferences(BaseModel):
+    lore_archivist: str = "anthropic/claude-3-opus"
+    grim_editor: str = "openai/gpt-4-turbo-preview"
+    tone_metrics: str = "anthropic/claude-3-sonnet"
+    supervisor: str = "anthropic/claude-3-opus"
+
+
+# Available models for each provider
+AVAILABLE_MODELS = {
+    "anthropic/claude-3-opus": "Claude 3 Opus",
+    "anthropic/claude-3-sonnet": "Claude 3 Sonnet",
+    "anthropic/claude-3-haiku": "Claude 3 Haiku",
+    "openai/gpt-4-turbo-preview": "GPT-4 Turbo Preview",
+    "openai/gpt-4": "GPT-4",
+    "openai/gpt-3.5-turbo": "GPT-3.5 Turbo",
+    "google/gemini-pro": "Gemini Pro",
+    "meta-llama/llama-2-70b-chat": "Llama 2 70B Chat",
+    "mistralai/mistral-7b-instruct": "Mistral 7B Instruct"
+}
+
+# Default preferences
+_model_preferences = ModelPreferences()
+
+
+@router.get("/list")
+async def list_models() -> Dict[str, str]:
+    """Get list of available models."""
+    return AVAILABLE_MODELS
+
+
+@router.get("/preferences")
+async def get_model_preferences() -> ModelPreferences:
+    """Get current model preferences for agents."""
+    return _model_preferences
+
+
+@router.post("/agent-config")
+async def update_agent_config(config: AgentConfigRequest) -> Dict[str, str]:
+    """Update model configuration for a specific agent."""
+    global _model_preferences
+    
+    # Validate model exists
+    if config.model_id not in AVAILABLE_MODELS:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Model {config.model_id} not available"
+        )
+    
+    # Validate agent name
+    valid_agents = ["lore_archivist", "grim_editor", "tone_metrics", "supervisor"]
+    if config.agent_name not in valid_agents:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid agent name. Must be one of: {valid_agents}"
+        )
+    
+    # Update preferences
+    setattr(_model_preferences, config.agent_name, config.model_id)
+    
+    return {
+        "status": "success",
+        "agent": config.agent_name,
+        "model": config.model_id
+    }
