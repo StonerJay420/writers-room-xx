@@ -1,0 +1,51 @@
+# Project configuration for Writers Room X
+
+project:
+  name: "Writers Room X"
+  version: "1.0.0"
+  description: "Multi-agent AI system for manuscript editing and review"
+
+paths:
+  manuscript_dir: "data/manuscript"
+  codex_dir: "data/codex"
+  artifacts_dir: "artifacts"
+  patches_dir: "artifacts/patches"
+  reports_dir: "artifacts/reports"
+
+processing:
+  max_scene_length: 10000  # words
+  chunk_size: 900  # tokens
+  chunk_overlap: 200  # tokens
+  embedding_model: "all-MiniLM-L6-v2"
+  max_workers: 2
+
+api:
+  rate_limit:
+    requests_per_minute: 60
+    tokens_per_minute: 90000
+  timeout: 60  # seconds
+  retry:
+    max_attempts: 3
+    backoff_factor: 2
+
+edge_intensity:
+  levels:
+    0: "conservative"
+    1: "balanced"
+    2: "aggressive"
+    3: "experimental"
+  default: 1
+
+output_formats:
+  patches:
+    - unified_diff
+    - json
+  reports:
+    - json
+    - markdown
+    - html
+
+git:
+  auto_commit: true
+  branch_prefix: "wrx-patch"
+  commit_prefix: "[WRX]"
