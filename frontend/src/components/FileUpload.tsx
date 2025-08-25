@@ -20,9 +20,9 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
   const handleFiles = async (files: FileList) => {
     setUploading(true)
     setUploadResults([])
-    
+
     const results = []
-    
+
     for (const file of Array.from(files)) {
       if (!file.name.endsWith('.md')) {
         results.push({
@@ -36,7 +36,7 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
       try {
         const formData = new FormData()
         formData.append('file', file)
-        
+
         // Determine file type based on filename or let user choose
         const fileType = file.name.includes('codex') ? 'codex' : 'manuscript'
         formData.append('file_type', fileType)
@@ -60,10 +60,10 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
         })
       }
     }
-    
+
     setUploadResults(results)
     setUploading(false)
-    
+
     if (onUploadComplete && results.some(r => r.status === 'success')) {
       onUploadComplete()
     }
@@ -72,7 +72,7 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setDragActive(false)
-    
+
     if (e.dataTransfer.files) {
       handleFiles(e.dataTransfer.files)
     }

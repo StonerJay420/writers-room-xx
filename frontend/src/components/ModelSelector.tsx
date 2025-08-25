@@ -38,7 +38,7 @@ export function ModelSelector({ agentName, currentModel, onModelChange }: ModelS
   const fetchModels = async () => {
     setLoading(true)
     try {
-      const response = await fetch('http://localhost:8000/api/models/available')
+      const response = await fetch('http://0.0.0.0:8000/api/models/available')
       if (response.ok) {
         const data = await response.json()
         setModels(data)
