@@ -1,14 +1,9 @@
+
 """Scene management router."""
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional, Dict, Any
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
 from pydantic import BaseModel
 from pathlib import Path
-
-from ..db import get_read_session
-from ..models import Scene
-
 
 router = APIRouter(prefix="/scenes", tags=["scenes"])
 
@@ -18,94 +13,82 @@ class SceneMetadata(BaseModel):
     id: str
     chapter: int
     order_in_chapter: int
-    pov: Optional[str]
-    location: Optional[str]
-    beats_json: Optional[Dict[str, Any]]
-    links_json: Optional[Dict[str, Any]]
-
-
-class SceneDetail(BaseModel):
-    """Scene detail response model."""
-    meta: SceneMetadata
-    text: str
+    pov: Optional[str] = None
+    location: Optional[str] = None
+    beats_json: Optional[Dict[str, Any]] = None
+    links_json: Optional[Dict[str, Any]] = None
 
 
 @router.get("", response_model=List[SceneMetadata])
 async def list_scenes(
     chapter: Optional[int] = Query(None, description="Filter by chapter"),
-    search: Optional[str] = Query(None, description="Search in scene text"),
-    db: Session = Depends(get_read_session)
+    search: Optional[str] = Query(None, description="Search in scene text")
 ):
     """List all scenes with optional filtering."""
-    query = db.query(Scene)
+    scenes = []
     
-    # Apply filters
-    if chapter is not None:
-        query = query.filter(Scene.chapter == chapter)
+    # Read from data/manuscript directory
+    manuscript_dir = Path("data/manuscript")
+    if manuscript_dir.exists():
+        for md_file in manuscript_dir.glob("*.md"):
+            if md_file.name.startswith('.'):
+                continue
+                
+            scene_id = md_file.stem
+            
+            # Extract chapter and scene from filename pattern like "ch01_s02"
+            import re
+            match = re.match(r'ch(\d+)_s(\d+)', scene_id)
+            if match:
+                chapter_num = int(match.group(1))
+                order_num = int(match.group(2))
+            else:
+                chapter_num = 1
+                order_num = 1
+            
+            # Apply chapter filter if specified
+            if chapter is not None and chapter_num != chapter:
+                continue
+                
+            # Apply search filter if specified  
+            if search and search.lower() not in scene_id.lower():
+                continue
+                
+            scenes.append(SceneMetadata(
+                id=scene_id,
+                chapter=chapter_num,
+                order_in_chapter=order_num,
+                pov=None,
+                location=None,
+                beats_json={},
+                links_json={}
+            ))
     
-    if search:
-        # For now, just check if the search term is in the path
-        # In a real implementation, this would search the actual text content
-        query = query.filter(Scene.text_path.contains(search))
+    # Sort by chapter and order
+    scenes.sort(key=lambda s: (s.chapter, s.order_in_chapter))
     
-    # Order by chapter and scene number
-    query = query.order_by(Scene.chapter, Scene.order_in_chapter)
-    
-    scenes = query.all()
-    
-    return [
-        SceneMetadata(
-            id=scene.id,
-            chapter=scene.chapter,
-            order_in_chapter=scene.order_in_chapter,
-            pov=scene.pov,
-            location=scene.location,
-            beats_json=scene.beats_json,
-            links_json=scene.links_json
-        )
-        for scene in scenes
-    ]
+    return scenes
 
 
-@router.get("/{scene_id}", response_model=SceneDetail)
-async def get_scene(
-    scene_id: str,
-    db: Session = Depends(get_read_session)
-):
+@router.get("/{scene_id}")
+async def get_scene(scene_id: str):
     """Get a specific scene by ID."""
-    scene = db.query(Scene).filter(Scene.id == scene_id).first()
+    scene_path = Path(f"data/manuscript/{scene_id}.md")
     
-    if not scene:
+    if not scene_path.exists():
         raise HTTPException(status_code=404, detail=f"Scene {scene_id} not found")
     
-    # Read the actual text content from the file
-    text = ""
-    if scene.text_path:
-        text_path = Path(scene.text_path)
-        if text_path.exists():
-            content = text_path.read_text(encoding='utf-8')
-            
-            # Remove front matter if present
-            if content.startswith('---'):
-                parts = content.split('---', 2)
-                if len(parts) >= 3:
-                    text = parts[2].strip()
-                else:
-                    text = content
-            else:
-                text = content
-        else:
-            text = f"[Text file not found: {scene.text_path}]"
+    content = scene_path.read_text(encoding='utf-8')
     
-    return SceneDetail(
-        meta=SceneMetadata(
-            id=scene.id,
-            chapter=scene.chapter,
-            order_in_chapter=scene.order_in_chapter,
-            pov=scene.pov,
-            location=scene.location,
-            beats_json=scene.beats_json,
-            links_json=scene.links_json
-        ),
-        text=text
-    )
+    # Remove frontmatter if present
+    text = content
+    if content.startswith('---'):
+        parts = content.split('---', 2)
+        if len(parts) >= 3:
+            text = parts[2].strip()
+    
+    return {
+        "id": scene_id,
+        "text": text,
+        "path": str(scene_path)
+    }

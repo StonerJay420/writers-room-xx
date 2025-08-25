@@ -49,7 +49,7 @@ export default function Home() {
       if (selectedChapter) params.append('chapter', selectedChapter.toString())
       if (searchTerm) params.append('search', searchTerm)
       
-      const response = await fetch(`http://localhost:8000/api/scenes?${params}`)
+      const response = await fetch(`/api/scenes?${params}`)
       if (response.ok) {
         const data = await response.json()
         setScenes(data)
@@ -63,7 +63,7 @@ export default function Home() {
 
   const loadModelPreferences = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/models/preferences')
+      const response = await fetch('/api/models/preferences')
       if (response.ok) {
         const data = await response.json()
         setModelPreferences(data)
@@ -75,7 +75,7 @@ export default function Home() {
 
   const handleIndexFiles = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/ingest/index', {
+      const response = await fetch('/api/ingest/index', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -97,7 +97,7 @@ export default function Home() {
 
   const handleModelChange = async (agentName: string, modelId: string) => {
     try {
-      const response = await fetch('http://localhost:8000/api/models/agent-config', {
+      const response = await fetch('/api/models/agent-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -120,7 +120,7 @@ export default function Home() {
   const processScene = async (sceneId: string) => {
     setProcessingScene(sceneId)
     try {
-      const response = await fetch('http://localhost:8000/api/patches/generate', {
+      const response = await fetch('/api/patches/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
