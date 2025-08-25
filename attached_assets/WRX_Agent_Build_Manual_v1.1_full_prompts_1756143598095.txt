@@ -1,0 +1,1656 @@
+
+
+---
+
+PROMPT 01 — Backend Environments, Dependencies, and Settings
+Context: Implement API (FastAPI) and worker (RQ) foundations with explicit dependencies and settings.
+Task: Initialize Python environments for /api and /worker using pip + requirements.txt (no Poetry/uv). Create minimal app/worker entry points and configuration.
+Requirements:
+- Python 3.11.
+- Use a single requirements.txt shared by /api and /worker.
+- Provide minimal health endpoint in API.
+- Centralized settings via Pydantic Settings.
+Implement:
+1. /api/requirements.txt (one file, later copied to worker):
+   fastapi==0.111.0
+   uvicorn[standard]==0.30.3
+   pydantic==2.7.4
+   pydantic-settings==2.3.3
+   SQLAlchemy==2.0.31
+   psycopg[binary]==3.2.1
+   pgvector==0.2.5
+   redis==5.0.7
+   rq==1.16.2
+   httpx==0.27.0
+   python-dotenv==1.0.1
+   textstat==0.7.4
+   nltk==3.8.1
+   spacy==3.7.5
+   rapidfuzz==3.9.6
+   numpy==1.26.4
+   pandas==2.2.2
+   sentencepiece==0.2.0
+   scikit-learn==1.5.1
+   sentence-transformers==3.0.1
+   langgraph==0.2.34
+   tenacity==8.5.0
+   boto3==1.34.151
+   GitPython==3.1.43
+   typer==0.12.3
+2. /api/src/api/ files:
+   - __init__.py (empty).
+   - config.py: Pydantic Settings class exposing env vars from .env.
+   - main.py: FastAPI app with /health returning {status:"ok"} and placeholder root /.
+   - db.py: SQLAlchemy engine/session factory; create pgvector extension on startup if available (guarded).
+   - schemas.py: Empty Pydantic module placeholder.
+   - models.py: Empty SQLAlchemy models placeholder (real models in Prompt 03).
+3. /worker/:
+   - Copy requirements.txt from /api.
+   - worker/main.py: Initialize Redis connection from REDIS_URL; create RQ Queue("wrx"); minimal worker loop stub (actual job function later).
+Acceptance:
+- pip install -r api/requirements.txt succeeds.
+- uvicorn src.api.main:app --reload serves /health with 200 OK.
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 2 — Dockerfiles and docker-compose for Local Dev
+Context: Containerize API, Worker, UI, Postgres, and Redis.
+Task: Provide Dockerfiles and a compose stack.
+Requirements:
+- Dockerfiles:
+  - /infra/docker/api.Dockerfile: python:3.11-slim; copy src; pip install -r requirements.txt; run uvicorn on 0.0.0.0:8000.
+  - /infra/docker/worker.Dockerfile: python:3.11-slim; run RQ worker.
+  - /infra/docker/ui.Dockerfile: node:20; pnpm install && pnpm build; pnpm start.
+- /infra/docker-compose.yml:
+  - Services: api (8000), worker, ui (3000), postgres (5432), redis (6379), optional minio (S3 alternative for dev).
+  - Mount volumes for Postgres data.
+  - Read environment from ../.env.
+Acceptance:
+- docker compose up --build starts all services.
+- UI http://localhost:3000 and API http://localhost:8000 respond.
+
+
+--------------------------------------------------------------------------------
+
+
+PROMPT 3 — DigitalOcean Spaces + CDN for Reports
+```
+You are an AI coding agent working in "writers-room-x".
+GOAL
+Serve report and audio artifacts via DigitalOcean Spaces CDN with cache control and signed URL support.
+CREATE / MODIFY
+1) /api/src/api/storage/s3.py
+   - Add: generate_cdn_url(key: str, ttl_seconds: int = 3600) -> str
+     - If CDN domain is configured, return CDN URL with query param token (HMAC of key+expiry) OR plain public URL if no signing required.
+   - Add: put_object_with_cache(key: str, bytes_or_file, content_type: str, cache_control: str = "public, max-age=86400")
+   - Read env:
+     S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY, S3_CDN_DOMAIN (optional), S3_SIGNING_SECRET (optional)
+2) /api/src/api/routers/reports.py
+   - GET /reports/list → [{"key":"...", "cdn_url":"...", "size":..., "last_modified":...}]
+   - Use generate_cdn_url for each item.
+3) /ui
+   - Reports page: list with download/open buttons; show cache age badge.
+REQUIREMENTS
+- If S3_CDN_DOMAIN is set, URLs must use it; else fallback to plain Spaces URL.
+- If S3_SIGNING_SECRET is set, append ?exp=<unix>&sig=<hmac> to the URL.
+ACCEPTANCE
+- Uploading a report with put_object_with_cache sets Cache-Control header.
+- Reports page shows CDN URLs that load successfully from the browser.
+```
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 4 — Managed Postgres Logical Replica Support
+```
+You are an AI coding agent in "writers-room-x".
+GOAL
+Support read-only queries against a Postgres replica for heavy read endpoints; fall back to primary when replica env is not set.
+CREATE / MODIFY
+1) /api/src/api/config.py
+   - Add env: REPLICA_DB_URL (optional)
+2) /api/src/api/db.py
+   - Create two SQLAlchemy engines: primary_engine (DB_URL) and replica_engine (REPLICA_DB_URL or primary_engine).
+   - Provide get_read_session() that uses replica_engine; get_write_session() uses primary_engine.
+3) Replace read-heavy endpoints to use get_read_session():
+   - search, threads, reports list, scenes list.
+REQUIREMENTS
+- Transactions must not run on replica; writes and migrations remain on primary.
+- If REPLICA_DB_URL missing, everything continues to work.
+ACCEPTANCE
+- With REPLICA_DB_URL set, read endpoints connect to replica (verify via log/connection string); write paths still hit primary.
+```
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 5 — DigitalOcean Monitoring Alerts (App-Side Webhooks)
+```
+You are an AI coding agent in "writers-room-x".
+GOAL
+Emit webhook alerts when 5xx rate, response latency, or token/cost spikes exceed thresholds; integrate with DO Monitoring dashboards.
+CREATE / MODIFY
+1) /api/src/api/telemetry/alerts.py
+   - Function: maybe_alert(metric: str, value: float, threshold: float, context: dict)
+   - Sends POST to ALERT_WEBHOOK_URL with JSON payload on breach.
+   - Read env: ALERT_WEBHOOK_URL (optional)
+2) /api/src/api/middleware/metrics.py
+   - ASGI middleware to track response times and 5xx counts in rolling windows.
+   - Periodically call maybe_alert("latency_ms", ...), maybe_alert("error_rate", ...).
+3) /api/src/api/cost/ledger.py
+   - After each pass, evaluate cost/token thresholds and maybe_alert("pass_cost_usd", ...).
+4) /api/src/api/main.py
+   - Register middleware.
+REQUIREMENTS
+- Alert payload must include timestamp, metric, value, threshold, route, scene_id (if applicable).
+ACCEPTANCE
+- Forcing a 5xx or high-latency route produces a webhook call with expected payload.
+```
+
+
+--------------------------------------------------------------------------------
+
+
+PROMPT 6 — SQLAlchemy Models and Alembic Migrations
+Context: Define persistent schema for scenes, characters, jobs, artifacts, and embeddings.
+Task: Implement SQLAlchemy models and Alembic migrations for /api.
+Requirements:
+- Use Postgres 15+.
+- Use pgvector for embeddings with dimension 384 (MiniLM embeddings).
+- Provide Alembic initialized and a migration that creates all tables and the vector extension when possible.
+Implement:
+1. /api/alembic/: initialize Alembic (alembic.ini, versions/).
+2. /api/src/api/models.py with SQLAlchemy 2.0 style:
+   - Scene:
+     - id TEXT PK (e.g., "ch02_s03"), chapter INT, order_in_chapter INT,
+     - pov TEXT, location TEXT, text_path TEXT,
+     - beats_json JSON, links_json JSON,
+     - created_at TIMESTAMP, updated_at TIMESTAMP.
+   - Character:
+     - id TEXT PK ("char:MC"), name TEXT,
+     - voice_tags_json JSON, preferred_words_json JSON, banned_words_json JSON,
+     - arc_flags_json JSON, canon_quotes_json JSON,
+     - updated_at TIMESTAMP.
+   - Job:
+     - id TEXT PK (UUID string), scene_id FK -> Scene.id,
+     - status TEXT (queued|running|done|error),
+     - agents_json JSON, result_json JSON,
+     - created_at TIMESTAMP, updated_at TIMESTAMP.
+   - Artifact:
+     - id TEXT PK (UUID string), scene_id FK -> Scene.id,
+     - variant TEXT (safe|bold|red_team),
+     - diff_key TEXT (S3 key), metrics_before JSON, metrics_after JSON,
+     - receipts_json JSON, created_at TIMESTAMP.
+   - SceneEmbedding:
+     - id UUID, scene_id TEXT, chunk_no INT,
+     - content TEXT,
+     - embedding VECTOR(384),
+     - meta JSONB.
+3. /api/alembic/versions/ migration:
+   - Create extension if possible: CREATE EXTENSION IF NOT EXISTS vector;
+   - Create tables with indexes:
+     - SceneEmbedding: index on (scene_id, chunk_no), and ivfflat index on embedding (comment stub if ivfflat unavailable).
+4. /api/src/api/db.py: on startup, ensure Alembic upgrade runs if AUTO_MIGRATE=1.
+Acceptance:
+- alembic upgrade head against a local Postgres succeeds.
+- Tables exist and SceneEmbedding.embedding is VECTOR(384).
+
+
+--------------------------------------------------------------------------------
+
+
+PROMPT 7 — Metrics Targets Config and Loader
+Context: Enforce house style targets (ED metrics).
+Task: Add YAML configs and loader.
+Requirements:
+- Provide three config files under /api/src/api/configs/.
+- Expose a loader module to read + cache them.
+- Tone agent must read metrics from YAML, not hardcode.
+Implement:
+1. /api/src/api/configs/metrics.yaml with the exact content:
+readability:
+  flesch_reading_ease: {target: 80, min: 75, max: 88}
+lexicon:
+  common_words_pct: {target: 81, min: 78, max: 85}
+  complex_words_pct: {target: 7, min: 5, max: 9}
+  unique_words_pct: {target: 48, min: 45, max: 52}
+  avg_word_len: {target: 4.1, min: 3.9, max: 4.3}
+verbs:
+  active_pct: {target: 98, min: 95, max: 99}
+  auxiliary_pct: {target: 12, min: 8, max: 17}
+  continuous_pct: {target: 12, min: 8, max: 15}
+sentences:
+  avg_len: {target: 13, min: 9.7, max: 15.6}
+dialogue:
+  proportion_pct: {target: 42, min: 9, max: 76}
+pace:
+  score: {target: 47, min: 40, max: 57}
+affect:
+  overall_tone: {target: -0.3, min: -0.4, max: -0.1}
+  anger_pct: {target: 38, min: 33, max: 45}
+  fear_pct: {target: 40, min: 34, max: 47}
+  happiness_pct: {target: 41, min: 34, max: 47}
+  disgust_pct: {target: 16, min: 13, max: 20}
+  surprise_pct: {target: 40, min: 34, max: 46}
+  sadness_pct: {target: 31, min: 27, max: 36}
+  neutral_pct: {target: 16, min: 14, max: 18}
+pos:
+  nouns_pct: {target: 19, min: 17, max: 23}
+  verbs_pct: {target: 21, min: 19, max: 24}
+  adjectives_pct: {target: 6, min: 4, max: 7}
+  adverbs_pct: {target: 8, min: 6, max: 10}
+  pronouns_pct: {target: 15, min: 11, max: 18}
+  other_pct: {target: 30, min: 27, max: 33}
+2. /api/src/api/configs/agents.yaml:
+supervisor: {model: "reasoner-1", max_tokens: 4000}
+lore_archivist: {model: "reasoner-1", tools: ["rag","citations"], temperature: 0.3}
+grim_editor: {model: "stylist-1", tools: ["diff","metrics"], temperature: 0.7}
+tone_metrics: {model: "critic-1", tools: ["metrics"], temperature: 0.2}
+3. /api/src/api/configs/project.yaml:
+edge_intensity: 1
+patch_variants: ["safe","bold"]
+banned_global: ["neon","echoes","symphony"]
+chapter_reversal_percent: [8,11,50]
+4. /api/src/api/config_loader.py:
+   - Functions to load and cache metrics.yaml, agents.yaml, project.yaml.
+Acceptance:
+- Tone agent reads metrics.yaml at runtime.
+- Supervisor reads project.yaml for variants and edge intensity.
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 8 — Ingestion Pipeline and Scene Endpoints
+Context: Index codex and manuscript from local files into DB + embeddings.
+Task: Implement ingestion and query endpoints.
+Requirements:
+- Scan data/manuscript/** and data/codex/** for .md files.
+- Scene ID format: chNN_sMM from folder/filename (chapter number from folder name).
+- Extract optional front-matter YAML if present; otherwise infer metadata.
+- Store raw Markdown path in Scene.text_path.
+Implement:
+1. /api/src/api/ingest/indexer.py
+   - discover_files(paths: list[str]) -> list[Path].
+   - parse_scene(path) -> (scene_meta, text).
+   - Create/Upsert Scene rows; run chunk_text + upsert_scene_chunks.
+2. /api/src/api/routers/ingest.py
+   - POST /ingest/index body: {"paths": ["data/manuscript","data/codex"], "reindex": true}
+     - Returns {"indexed_docs": N, "scenes": M}.
+   - GET /scenes?chapter=&search=
+     - Returns basic scene metadata list.
+   - GET /scenes/{scene_id}
+     - Returns {meta, text} where text is the Markdown content.
+Acceptance:
+- POST /ingest/index indexes seed files and returns counts.
+- GET /scenes lists scenes; GET /scenes/{id} returns text.
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 9 — MeiliSearch Semantic Finder
+```
+You are an AI coding agent in "writers-room-x".
+
+GOAL
+Enable fast semantic/concept search across codex and scenes using MeiliSearch.
+
+CREATE / MODIFY
+1) /api/src/api/search/indexer.py
+   - Index documents with fields: id, type (scene|codex), chapter, order, text, key terms, embeddings (optional).
+   - Functions: index_all(), index_scene(scene_id), search(q:str, filters:dict) -> list[results]
+
+2) /api/src/api/routers/search.py
+   - GET /search?q=...&filters=type:scene|codex,chapter:.. → JSON results with snippet and link target.
+
+3) /ui
+   - Omnibox with filters; keyboard shortcut (/). Results navigate to scene and highlight match.
+
+REQUIREMENTS
+- Use synonyms for domain terms (e.g., "rationing"~"allocation").
+- Support prefix and typo tolerance.
+
+ACCEPTANCE
+- Searching “power rationing corruption” returns relevant scenes in seeded data; clicking navigates correctly.
+```
+
+
+
+--------------------------------------------------------------------------------
+
+
+PROMPT 10 — Core Agents with LangGraph (Supervisor, Lore, Line Edit, Metrics)
+Context: Orchestrate agents to produce patch variants and reports.
+Task: Implement agents and orchestration using LangGraph.
+Requirements:
+- Agents:
+  - Supervisor: plans which agents to call; composes variants (safe, bold).
+  - Lore Archivist: RAG lookup; block contradictions; produce canon receipts; may return diff.
+  - Grim Editor: line edits; unified diff + 3-bullet rationale.
+  - Tone & Metrics: compute metrics vs targets; return minimal diff + before/after metrics.
+- OpenRouter client wrapper reading OPENROUTER_API_KEY.
+- All diffs in unified diff format only.
+- Any lore-touching change must include a canon receipt (source file + line range).
+Implement:
+1. /api/src/api/agents/
+   - base.py: helpers for prompts/tools and a LLMClient wrapper for OpenRouter.
+   - supervisor.py: builds a JSON plan (agents + success criteria), executes, merges outputs into 1–2 variants.
+   - lore_archivist.py: retrieves up to 12 chunks via vector store, validates changes, outputs:
+     {
+       "findings":[{"issue":"...", "receipt":{"source":"<path>","lines":"Lx-Ly"}, "resolution":"..."}],
+       "diff":"<unified diff or empty>"
+     }
+   - grim_editor.py: returns {"diff":"...", "rationale":["...","...","..."]}.
+   - tone_metrics.py: imports metrics module, returns {"diff":"...", "before":{...}, "after":{...}}.
+2. /api/src/api/clients/openrouter.py: minimal HTTP client with model selection.
+Acceptance:
+- A local call against a sample scene yields 1–2 variants, canon receipts when needed, and metrics JSON.
+
+
+--------------------------------------------------------------------------------
+
+
+PROMPT 11 — Jobs, Redis Queue, and Pass Execution
+Context: Run agent passes asynchronously.
+Task: Add endpoints to submit jobs and fetch results. Implement worker to run passes and store artifacts to S3 (Spaces).
+Requirements:
+- Queue name: "wrx".
+- Spaces (S3) used for diffs and reports.
+- Job.status: queued|running|done|error.
+Implement:
+1. /api/src/api/storage/s3.py:
+   - Initialize boto3 client using S3_ENDPOINT, S3_ACCESS_KEY, S3_SECRET_KEY.
+   - put_text(key: str, content: str) -> None, get_text(key: str) -> str.
+2. /api/src/api/routers/passes.py:
+   - POST /passes/run body: {"scene_id":"...", "agents":["lore_archivist","grim_editor","tone_metrics"], "edge_intensity": 1}
+     - Enqueue RQ job run_pass.
+     - Return {"job_id":"..."}.
+   - GET /passes/{job_id}/result returns:
+     {
+       "scene_id":"...",
+       "variants":{"safe": {...}, "bold": {...}},
+       "reports":{"metrics": {...}, "canon_receipts":[...], "rationales": {...}}
+     }
+3. /worker/worker/main.py:
+   - Connect to REDIS_URL.
+   - Implement run_pass(scene_id, agents, edge_intensity):
+     - Load scene, call Supervisor → agents, assemble variants.
+     - Write diffs to Spaces under artifacts/patches/{scene_id}_{variant}.diff.
+     - Persist Artifact rows (diff key, metrics, receipts).
+     - Store result JSON in Job.result_json, set status accordingly.
+Acceptance:
+- POST /passes/run returns a job id.
+- Polling GET /passes/{job_id}/result returns variants with S3 keys.
+
+
+--------------------------------------------------------------------------------
+
+
+PROMPT 12 — Unified Diff Apply and Git Commit
+Context: Allow user to apply a selected variant to the manuscript.
+Task: Implement unified diff application with fuzzy matching and Git commit.
+Requirements:
+- Use GitPython for commits.
+- Dry-run detection: if anchors do not match (high drift), fail with clear error.
+Implement:
+1. /api/src/api/utils/diff_utils.py
+   - apply_unified_diff(original_text: str, diff: str) -> patched_text: str
+   - Use rapidfuzz to re-anchor hunks if line numbers drift; if similarity < 0.8, fail.
+2. /api/src/api/routers/patches.py
+   - POST /patches/apply body:
+     {"scene_id":"...","variant":"safe","commit_message":"Apply safe patch"}
+   - Steps:
+     - Resolve scene file path from DB.
+     - Fetch diff from S3.
+     - Read file, apply diff, write back.
+     - git add and git commit with provided message.
+     - Return { "status":"ok", "commit_sha":"..." }.
+Acceptance:
+- Applying a valid diff updates the file and returns a commit SHA.
+- Re-applying the same diff is idempotent (no duplicate hunks).
+
+
+--------------------------------------------------------------------------------
+
+
+PROMPT 13 — AUSTIN-1: Style & Tone Integrity Notary
+```
+You are an AI coding agent working in the monorepo "writers-room-x".
+
+GOAL
+Add a style/tone auditor that enforces ED metrics, per-character voice constraints, and global lexicon rules. It should block merges (patch apply) when violations exceed thresholds and optionally provide a minimal auto-fix diff.
+
+CREATE / MODIFY
+1) /api/src/api/agents/austin_style_notary.py
+   - Function: run_style_notary(scene_text: str, scene_meta: dict, metrics_cfg: dict, character_cfg: dict, project_cfg: dict) -> dict
+   - Return JSON:
+     {
+       "violations": [{"type":"banned_word|metric_drift|voice_drift", "detail":"...", "line":int}],
+       "scorecard": {"flesch":..., "avg_sentence_len":..., "...":...},
+       "suggested_diff": "<unified-diff or empty>"
+     }
+   - Behavior:
+     - Evaluate ED metrics from configs/metrics.yaml.
+     - Check global banned/preferred words and per-character lexicon (preferred/banned) using scene links.
+     - Compute deltas vs targets; mark drifts.
+     - If project_cfg.style_gate.block_on_banned == true and banned terms present → mark violation.
+     - Produce a conservative unified diff with minimal lexical swaps only when safe.
+
+2) /api/src/api/configs/project.yaml
+   - Add:
+     style_gate:
+       max_metric_delta: 0.1
+       block_on_banned: true
+
+3) /api/src/api/routers/passes.py
+   - Allow agent name "austin_style_notary".
+   - Include "scorecard" and "violations" in the agent result JSON.
+
+4) /ui
+   - Scene review page: add "Style Gate" panel showing violations and scorecard.
+   - Add a checkbox "Apply suggested auto-fix before commit" (default off).
+
+REQUIREMENTS
+- Do not alter canon nouns/dates/identifiers in suggested diffs.
+- suggested_diff must be valid unified diff relative to current scene text.
+- No full-text echoes in responses—diffs only.
+
+ACCEPTANCE
+- When a scene contains a global banned word, POST /passes/run with ["austin_style_notary"] returns violations > 0.
+- If suggested_diff is applied then rechecked, violations decrease or resolve.
+- Applying suggested_diff via /patches/apply succeeds without touching proper nouns.
+```
+
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 14 — Performance Linter on Commit
+```
+You are an AI coding agent in "writers-room-x".
+
+GOAL
+Block patch application if it violates performance thresholds (token delta, avg sentence length drift, passive voice ratio).
+
+CREATE / MODIFY
+1) /api/src/api/lint/perf_linter.py
+   - Function: lint_patch(original_text: str, diff: str, thresholds: dict) -> {"ok":bool, "reasons":[...]}
+   - Defaults: token_delta_pct <= 8%, avg_sentence_len drift <= +2 words, passive_voice_ratio <= configured max.
+
+2) /api/src/api/routers/patches.py
+   - Before committing, run perf linter; on fail, return 400 with reasons.
+
+3) /api/tests/test_perf_linter.py
+   - Ensure over-large diffs are rejected; safe diffs pass.
+
+REQUIREMENTS
+- Provide clear error messages for each failed metric.
+- Linter runs fast (<300ms on typical scenes).
+
+ACCEPTANCE
+- Oversized diff is blocked with explicit reasons; safe diff commits successfully.
+```
+
+
+
+--------------------------------------------------------------------------------
+
+
+PROMPT 15 — Continuity Graph & Timeline Sentinels
+```
+You are an AI coding agent in "writers-room-x".
+
+GOAL
+Create a continuity graph (who/what/where/when) and run checks for double-presence, implausible travel time, and injury persistence. Expose an endpoint and UI panel to show violations.
+
+CREATE / MODIFY
+1) /api/src/api/continuity/graph.py
+   - Build graph nodes: characters, locations, items.
+   - Edges: appears_in(scene_id, timestamp?), travels_to(from,to,eta), carries(item), injured(status,start_scene_id).
+   - Utility to upsert facts per scene.
+
+2) /api/src/api/continuity/checks.py
+   - Functions:
+     check_double_presence(scene_ordered: list) -> list[violations]
+     check_travel_time(scene_ordered: list, distances_cfg: dict) -> list[violations]
+     check_injury_persistence(scene_ordered: list) -> list[violations]
+
+3) /api/src/api/routers/continuity.py
+   - POST /continuity/check {scene_id} → returns violations grouped by rule.
+
+4) /ui
+   - "Continuity" panel listing violations with links to scenes.
+
+REQUIREMENTS
+- Use a deterministic scene order (chapter, order_in_chapter).
+- Keep checks read-only; no auto-diff.
+
+ACCEPTANCE
+- Seeded contradictions (character in two places; too-fast travel; disappearing injury) are detected and returned by the endpoint; UI renders them clearly.
+```
+
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 16 — Continuity Physics (Time–Space Sentinel)
+```
+You are an AI coding agent in "writers-room-x".
+GOAL
+Validate time/space realism (travel times, daylight, wounds/gear persistence) and report violations with computed expectations; no auto-fix.
+CREATE / MODIFY
+1) /api/src/api/continuity/constraints.py
+   - Rules:
+     - travel_time(from,to) >= distance/speed table
+     - daylight consistency (sunrise/sunset by simple config)
+     - wound/gear persists until explicit removal
+   - check_physics(scene_ordered) -> {"violations":[...],"assumptions":{...}}
+2) /api/src/api/routers/continuity.py
+   - POST /continuity/physics_check -> returns violations
+3) /ui
+   - Physics tab in Continuity panel; show violations and assumptions table.
+REQUIREMENTS
+- Use simple config JSON for distances and daylight; no external API calls.
+ACCEPTANCE
+- Implausible travel or daylight mismatch in seed scenes is detected and returned with a computed minimum feasible time.
+```
+
+
+--------------------------------------------------------------------------------
+
+
+PROMPT 17 — Character Voice Simulator
+```
+You are an AI coding agent in "writers-room-x".
+
+GOAL
+Generate three alternative renderings of a selected dialogue line in a character’s calibrated voice and record the user’s blind choice.
+
+CREATE / MODIFY
+1) /api/src/api/agents/voice_sim.py
+   - Function: simulate_line(character_id: str, line: str, exemplars: list[str]) -> list[str]  # returns 3 variants
+   - Respect character voice_tags, preferred/banned words.
+
+2) /ui
+   - On selecting a dialogue line, open "Voice Sim" tool; show 3 anonymized variants; record choice via A/B module.
+
+REQUIREMENTS
+- Do not change facts inside the line.
+- Keep length within ±20% of original.
+
+ACCEPTANCE
+- Returns 3 distinct variants; preference stored; subsequent Dialogue Demon edits can bias toward chosen style.
+```
+
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 18 — Reader Persona Gauntlet
+```
+You are an AI coding agent in "writers-room-x".
+
+GOAL
+Add critique personas ("hostile reviewer", "genre purist", "film producer") that return surgical notes with line references.
+
+CREATE / MODIFY
+1) /api/src/api/agents/persona_gauntlet.py
+   - Function: run_persona_notes(scene_text: str, persona: str) -> list[{"line":N,"note":"...","severity":"low|med|high"}]
+   - Ensure actionable, text-grounded comments.
+
+2) /ui
+   - Persona Gauntlet panel with toggles; display persona notes grouped by severity.
+
+REQUIREMENTS
+- No rewrites; notes only.
+- Include at least 5 notes per persona when text length allows.
+
+ACCEPTANCE
+- Each persona yields 5–8 precise notes with line numbers on test scenes.
+```
+
+
+
+--------------------------------------------------------------------------------
+
+
+PROMPT 19 — Inline Receipts & Hotkeys
+```
+You are an AI coding agent in "writers-room-x".
+
+GOAL
+Improve UX with inline canon receipt popovers and global review hotkeys.
+
+CREATE / MODIFY
+1) /ui/components/CanonReceiptPopover.tsx
+   - Given a changed token with source ref, display a small popover showing the canon snippet and path/line.
+
+2) Integrate with diff viewer:
+   - Hovering a changed noun/adjective shows the popover if a receipt exists.
+
+3) Global hotkeys:
+   - G: toggle diff on/off
+   - H: jump to next/previous hook
+   - R: toggle receipts
+
+REQUIREMENTS
+- Popovers must be non-blocking and keyboard-accessible.
+- Do not show popover for tokens without receipts.
+
+ACCEPTANCE
+- Hotkeys work; popovers render with correct snippets when hovering receipt-backed tokens.
+```
+
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 20 — Snapshot & Rollback Locker
+```
+You are an AI coding agent in "writers-room-x".
+
+GOAL
+Allow named snapshots per scene/chapter and support restore/rollback with diffs.
+
+CREATE / MODIFY
+1) /api/src/api/snapshots.py
+   - Functions:
+     create_snapshot(scope: "scene|chapter", id: str, note: str) -> {"snapshot_id": "..."}
+     restore_snapshot(snapshot_id: str) -> {"diff_preview":"...", "status":"ready|conflict"}
+   - Use Git tags and metadata files to store snapshot notes and scope.
+
+2) /api/src/api/routers/snapshots.py
+   - POST /snapshots/create
+   - POST /snapshots/restore
+
+3) /ui
+   - Snapshot manager panel: list, create, preview diff, restore with confirm.
+
+REQUIREMENTS
+- Restores must be dry-run previewable; conflicts should abort with guidance.
+- Tag names must be unique and URL-safe.
+
+ACCEPTANCE
+- Create and restore snapshots work; preview diff shows pending changes; applied restores commit successfully.
+```
+
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 21 — Cost & Cache Brain
+```
+You are an AI coding agent in "writers-room-x".
+
+GOAL
+Track real-time cost per agent call and add memoization to reuse outputs when inputs (scene hash + config hash) are unchanged.
+
+CREATE / MODIFY
+1) /api/src/api/cost/ledger.py
+   - record_call(agent, scene_id, tokens_in, tokens_out, cost_usd)
+   - totals_per_pass(pass_id) and recent_stats()
+
+2) /api/src/api/agents/cache_wrapper.py
+   - Decorator: @cache_result(key=scene_hash|config_hash) -> returns cached agent output when available.
+
+3) /ui
+   - "Cost & Cache" widget: show current pass cost estimate and cache hit rate.
+
+REQUIREMENTS
+- Cache invalidates when scene text or relevant configs change.
+- Ledger must persist summaries per pass.
+
+ACCEPTANCE
+- Re-running the same pass shows cache hits and reduced incremental cost; ledger sums visible in UI.
+```
+
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 22 — Mobile PWA & Offline Mode
+```
+You are an AI coding agent in "writers-room-x".
+
+GOAL
+Provide a PWA with offline reading/annotation and a queue to sync passes when back online.
+
+CREATE / MODIFY
+1) /ui/public/manifest.json and a service worker with cache strategy for scenes and assets.
+
+2) IndexedDB layer:
+   - Store scenes, annotations, and queued actions (run pass/apply patch requests).
+
+3) /api/src/api/routers/sync.py
+   - POST /sync/apply {actions:[...]} → apply queued actions server-side.
+
+REQUIREMENTS
+- Conflict resolution: if server text changed, mark conflict and do not auto-apply; show a merge UI prompt later.
+- PWA must be installable (Lighthouse PWA checks pass).
+
+ACCEPTANCE
+- App installs; offline annotations persist; queued pass runs successfully after reconnect and sync.
+```
+
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 23 — Market Scout (Comps & Pacing Comparison, Opt-in)
+```
+You are an AI coding agent in "writers-room-x".
+
+GOAL
+Compare your beat curves to uploaded comp outlines and summarize differences. No web crawling; comps are user-uploaded.
+
+CREATE / MODIFY
+1) /api/src/api/agents/market_scout.py
+   - compare_curves(project_curve, comp_curve) -> {"overlap":..., "gaps":[...], "notes":[...]}
+
+2) /api/src/api/routers/comps.py
+   - POST /comps/upload (JSON outline or CSV)
+   - GET /comps/list
+   - GET /comps/compare?comp_id=...
+
+3) /ui
+   - "Market Scout" chart overlay for selected comp; list notable divergences.
+
+REQUIREMENTS
+- Store comps in DB with metadata; no external fetches.
+- Keep summaries actionable and specific.
+
+ACCEPTANCE
+- Uploading a comp enables overlay; compare endpoint returns gap notes; UI shows overlay correctly.
+```
+
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 24 — DO Function: Nightly Lint & Report
+```
+You are an AI coding agent in "writers-room-x".
+
+GOAL
+Add a DigitalOcean Function that triggers /batch/nightly on the API, then writes an HTML lint/report to Spaces. Return the S3 key.
+
+CREATE / MODIFY
+1) /infra/functions/wrx-nightly/index.js
+   - Node 18 runtime.
+   - Reads env: API_URL, CRON_KEY.
+   - POST to API_URL/batch/nightly with header X-CRON-KEY: CRON_KEY; return response JSON.
+
+2) /api/src/api/routers/batch.py
+   - Ensure /batch/nightly runs selected agents, aggregates lint results (style gate, perf linter, continuity), produces an HTML report, uploads to Spaces, and returns the S3 key.
+
+3) Docs
+   - Note DigitalOcean Function env vars and deployment steps.
+
+REQUIREMENTS
+- Function must handle HTTP errors and return statusCode + error body.
+- Report includes per-chapter summaries and links to scenes.
+
+ACCEPTANCE
+- Invoking the function returns 200 and a report S3 key; opening the CDN URL shows the HTML report.
+```
+
+---
+
+You now have Prompts 01–20. Next message contains Prompts 21–40.
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 25 — App Platform Cron: Drift Audit
+```
+You are an AI coding agent in "writers-room-x".
+GOAL
+Run a scheduled drift audit (style/voice/metrics) and publish HTML/CSV into Spaces; provide an App Platform spec for the cron worker.
+CREATE / MODIFY
+1) /api/src/api/routers/audit.py
+   - GET /audit/drift
+     - Computes per-character drift vs ED targets and voice lexicons.
+     - Returns {"html_key":"artifacts/reports/drift-<date>.html","csv_key":"artifacts/reports/drift-<date>.csv"} after uploading to Spaces.
+2) /infra/app-platform/audit-cron.app.yaml
+   - App Platform spec for a worker service:
+     - Container image reference (same as /api worker or dedicated runner)
+     - Schedules: daily "curl -fsS <API_URL>/audit/drift"
+     - Env: API_URL, API_KEY (if needed)
+3) /ui
+   - Add "Drift Audit" link to Reports that opens latest HTML via CDN.
+REQUIREMENTS
+- Audit HTML must include a table with deltas per metric and character; CSV must match columns.
+ACCEPTANCE
+- Deploying the cron worker triggers daily audit; files appear in Spaces and render in the UI.
+```
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 26 — AUSTIN-4: Motif Alchemist
+```
+You are an AI coding agent in "writers-room-x".
+GOAL
+Detect recurring motifs/symbols and propose 1–2 short callbacks (<=18 words each) as optional insertions, preserving canon.
+CREATE / MODIFY
+1) /api/src/api/agents/motif_alchemist.py
+   - extract_motifs(scene_text) -> [{"label":"ozone stink","count":..,"positions":[...]}]
+   - propose_callbacks(scene_id, scene_text, motif_graph) -> {"diff":"<unified-diff>","notes":[...]} 
+   - Guardrails: no proper noun changes; only additions at natural seams.
+2) /api/src/api/routers/passes.py
+   - Register "motif_alchemist" and include notes/diff in result JSON.
+3) /ui
+   - "Motifs" panel with occurrences graph; show callback suggestions; allow include/exclude per hunk.
+ACCEPTANCE
+- Seeded repeated phrase produces at least one callback suggestion; diff applies cleanly and passes perf linter.
+```
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 27 — Scene Contract Tester
+```
+You are an AI coding agent in "writers-room-x".
+GOAL
+Derive each scene’s "promise" (setup), "delivery" (payoff), and "exit hook"; flag gaps and propose a 1-line exit hook if missing.
+CREATE / MODIFY
+1) /api/src/api/agents/scene_contract.py
+   - analyze_contract(scene_text) -> {"promise":"...", "delivery":"...", "exit_hook":"...", "gaps":[...]}
+   - If exit_hook missing → propose diff inserting a <=16-word line at end.
+2) /api/src/api/routers/passes.py
+   - Register "scene_contract" and include analysis + optional diff.
+3) /ui
+   - "Contract" panel showing the trio; toggle to apply suggested exit hook.
+ACCEPTANCE
+- Scenes lacking an exit hook get a single-line insertion diff; apply passes linter and commit.
+```
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 28 — Author Taste Profiler (Preference Learning)
+```
+You are an AI coding agent in "writers-room-x".
+GOAL
+Learn user preferences from Blind A/B choices and adjust agent weighting and variant ranking.
+CREATE / MODIFY
+1) /api/src/api/learning/taste_profiler.py
+   - update_weights(user_id, agent_contribs: dict, choice: str) -> None
+     - Implement bounded weight updates (e.g., +/-0.05) with decay.
+   - get_weights(user_id) -> dict[agent_name->float]
+2) /api/src/api/agents/supervisor.py
+   - Incorporate get_weights(user_id) into agent call order and variant rank scoring.
+3) /ui
+   - "Your Taste" widget: shows current weights per agent (chips/bars).
+REQUIREMENTS
+- Persist weights in Redis or DB; include TTL-based decay.
+ACCEPTANCE
+- After multiple A/B choices, weight shifts are visible and measurably impact variant ordering.
+```
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 29 — Edit-Pair Miner → Style LoRA Trainer
+```
+You are an AI coding agent in "writers-room-x".
+GOAL
+Collect (before, after) pairs on patch apply and provide a script to train a small LoRA that captures the author’s line-level style; allow routing to this LoRA.
+CREATE / MODIFY
+1) /api/src/api/learning/edit_pairs.py
+   - on_patch_applied(scene_id, before:str, after:str, meta:dict) -> store pair to DB or parquet in /artifacts/pairs/
+2) /scripts/train_lora.py
+   - Input: folder of pairs
+   - Output: /artifacts/models/stylist-lora/ with model files
+   - Use PEFT; training args configurable via CLI flags
+3) /api/src/api/configs/agents.yaml
+   - Add stylist-lora route toggle for "grim_editor" and "dialogue_demon".
+4) /api/src/api/agents/clients/openrouter.py
+   - If model=="stylist-lora", load local PEFT adapter (stub interface acceptable for code agent).
+REQUIREMENTS
+- Do not check large binaries into Git; write to Spaces (optional) after training.
+ACCEPTANCE
+- After seeding pairs and running train script, a model artifact folder exists; config switch routes stylist calls to stylist-lora without errors.
+```
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 30 — Emotion Waveform Composer
+```
+You are an AI coding agent in "writers-room-x".
+GOAL
+Compute paragraph-level emotion scores, compare to a target waveform, and propose up to two micro-edits to nudge toward the target.
+CREATE / MODIFY
+1) /api/src/api/metrics/emotion_curve.py
+   - paragraph_emotions(scene_text) -> [{"idx":0,"anger":..,"fear":..,"..."}]
+   - target curve from configs/metrics.yaml or project.yaml
+2) /api/src/api/agents/emotion_composer.py
+   - suggest_micro_edits(scene_text, curve, target) -> {"diff":"<unified-diff>","notes":[...]}
+   - Max 2 small edits (<=20 words each), no canon changes.
+3) /api/src/api/routers/passes.py
+   - Register "emotion_composer".
+4) /ui
+   - Sparkline chart with overlay; show notes and toggle for applying diff.
+ACCEPTANCE
+- Scene produces curve; diff nudges indices toward target; token delta <= 3%.
+```
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 31 — Micro Fact Labs (Tech / Legal / Medical Advisors)
+```
+You are an AI coding agent in "writers-room-x".
+GOAL
+Provide optional advisory notes (no diffs) for tech, legal, and medical plausibility. Notes are severity-tagged and cite the lines they’re about.
+CREATE / MODIFY
+1) /api/src/api/agents/fact_kits/tech.py, legal.py, medical.py
+   - run_kit(scene_text) -> [{"line":N,"note":"...","severity":"low|med|high"}]
+2) /api/src/api/routers/facts.py
+   - POST /facts/check?kits=tech,legal,medical -> returns notes
+3) /ui
+   - "Fact Kits" tab with kit toggles; renders notes grouped by severity.
+REQUIREMENTS
+- No web browsing; heuristics and domain outlines only.
+- Do not suggest specific legal/medical advice—only plausibility concerns.
+ACCEPTANCE
+- Calling two kits on a seeded scene returns structured notes with line refs.
+```
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 32 — Cold-Reader Retention Oracle
+```
+You are an AI coding agent in "writers-room-x".
+GOAL
+Predict a "bail-out probability" for the current scene and propose up to two minimal hook/clarity upgrades.
+CREATE / MODIFY
+1) /api/src/api/metrics/retention_model.py
+   - build_features(scene_text) -> dict
+   - predict_bailout(features) -> float in [0,1]
+2) /api/src/api/agents/retention_oracle.py
+   - advise(scene_text) -> {"bailout":0.xx,"suggestions":[...],"diff":"<unified-diff>"}
+   - Diff limited to <=2 lines; no canon changes.
+3) /ui
+   - Retention gauge + list of suggestions; optional apply toggle.
+ACCEPTANCE
+- Weakly hooked test scene yields higher bailout score; diff inserts a small hook or clarity line; linter passes.
+```
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 33 — Packaging Forge (Logline / Blurb / Query / Comps)
+```
+You are an AI coding agent in "writers-room-x".
+GOAL
+Transform project beats into market-facing artifacts (logline, jacket blurb, query letter, comp list) and allow export as Markdown/PDF.
+CREATE / MODIFY
+1) /api/src/api/agents/packaging_forge.py
+   - build_logline(beat_map) -> str
+   - build_blurb(beat_map, tone="dark") -> str
+   - build_query(beat_map) -> str
+   - suggest_comps(threads, beat_map) -> [str]
+2) /api/src/api/routers/export.py
+   - GET /export/packaging?chapter=.. -> {md_key, pdf_key}
+   - Render Markdown and PDF (server-side); store in Spaces.
+3) /ui
+   - Export modal; preview Markdown; download links.
+REQUIREMENTS
+- Keep artifacts concise and professional; no spoilers in blurb.
+ACCEPTANCE
+- Endpoint returns valid keys; files exist in Spaces; UI previews and downloads work.
+```
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 34 — Prompt Lab + Versioned Presets
+```
+You are an AI coding agent in "writers-room-x".
+GOAL
+Create a prompt store with versioning, A/B testing, and the ability to pin a preset for each agent.
+CREATE / MODIFY
+1) /api/src/api/prompts/store.py
+   - CRUD: create_preset(agent, name, text), list_presets(agent), get_preset(id), pin_preset(agent, id), history(agent)
+   - Store metadata: created_by, created_at, win_rate (from A/B choices)
+2) Agents
+   - Load prompts by pinned preset; fallback to default prompt text.
+3) /ui
+   - Admin-only "Prompt Lab": edit/view presets, pin, rollback, show win rates.
+REQUIREMENTS
+- Editing a preset should not affect history; new version must be created.
+ACCEPTANCE
+- Pinning a preset changes the agent behavior on next run; history entries visible.
+```
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 35 — Collab Rooms & Presence
+```
+You are an AI coding agent in "writers-room-x".
+GOAL
+Enable real-time co-review with user presence, simple scene locks, and live selection highlights.
+CREATE / MODIFY
+1) /api/src/api/realtime/socket.py
+   - WebSocket endpoints:
+     - /ws/scene/{scene_id}: join/leave, broadcast presence (user_id, cursor), lock/unlock requests.
+   - Presence state in Redis with TTL.
+2) /ui
+   - Show avatars for online users; lock banner when someone holds a lock.
+   - Live selection highlights with user colors.
+REQUIREMENTS
+- Lock TTL must auto-release on disconnect or timeout.
+- Applying patches requires holding the lock; else API returns 423.
+ACCEPTANCE
+- Two browsers see each other’s cursors; lock prevents concurrent apply; unlock restores ability to apply.
+```
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 36 — Accessibility & Readability Pass
+```
+You are an AI coding agent in "writers-room-x".
+GOAL
+Provide an accessibility advisor for prose (readability aids) and UI toggles (dyslexia-friendly typography, reduced motion, high contrast).
+CREATE / MODIFY
+1) /api/src/api/agents/accessibility_pass.py
+   - advise(scene_text) -> [{"line":N,"suggestion":"...","type":"readability|confusable|contrast"}]
+2) /ui
+   - Accessibility panel with toggles:
+     - Dyslexia-friendly font option
+     - Increased line-height
+     - Reduced motion
+     - High-contrast mode
+REQUIREMENTS
+- Advisor gives suggestions only; no diffs.
+- UI preferences persist locally.
+ACCEPTANCE
+- Panel renders suggestions; toggles apply immediately and persist across reloads.
+```
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 37 — Localization / Glossary Generator
+```
+You are an AI coding agent in "writers-room-x".
+GOAL
+Detect invented terms, idioms, and domain vocabulary; generate a glossary with definitions and usage lines.
+CREATE / MODIFY
+1) /api/src/api/agents/localization_prep.py
+   - extract_terms(scene_text) -> [{"term":"...", "definition":"...", "usage_line":"ch02_s03:L14"}]
+2) /api/src/api/routers/glossary.py
+   - GET /glossary -> list
+   - POST /glossary -> add/update entries
+3) /ui
+   - Glossary editor: add/edit terms; click-to-copy definitions.
+REQUIREMENTS
+- Entries must be unique by term; maintain a slug; support export (JSON).
+ACCEPTANCE
+- Extracted terms appear; editing persists; export returns JSON.
+```
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 38 — Profanity & Register Calibrator
+```
+You are an AI coding agent in "writers-room-x".
+GOAL
+Analyze profanity/register vs. character voice and scene intensity; suggest minimal adjustments (up/down) with a tiny diff.
+CREATE / MODIFY
+1) /api/src/api/agents/register_calibrator.py
+   - analyze(scene_text, character_cfg, emotion_curve) -> {"overuse":[...],"underuse":[...],"diff":"<unified-diff>"}
+2) /api/tests/test_register_calibrator.py
+   - Seed scenes with overuse/underuse; ensure diff adjusts without altering proper nouns.
+3) /api/src/api/routers/passes.py
+   - Register "register_calibrator".
+REQUIREMENTS
+- Max change: 2 lines; maintain voice fidelity.
+ACCEPTANCE
+- Overuse flagged and reduced in tests; apply passes linter.
+```
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 39 — Spelling & Style Harmonizer (US/UK + Oxford Comma)
+```
+You are an AI coding agent in "writers-room-x".
+GOAL
+Harmonize spelling to US/UK preference and enforce style rules (e.g., Oxford comma) via a conservative unified diff.
+CREATE / MODIFY
+1) /api/src/api/configs/style.yaml
+   - Example:
+     spelling_variant: "US"  # or "UK"
+     oxford_comma: true
+2) /api/src/api/agents/style_harmonizer.py
+   - harmonize(scene_text, style_cfg) -> {"diff":"<unified-diff>","changes":[...]}
+   - Map common US↔UK spellings; adjust Oxford comma where safe.
+3) /api/src/api/routers/passes.py
+   - Register "style_harmonizer".
+REQUIREMENTS
+- Do not alter quoted proper nouns; skip dialectal dialogue unless character voice_tags permit.
+ACCEPTANCE
+- Mixed “colour/color” is harmonized per config; Oxford comma applied where syntactically safe; diff applies cleanly.
+```
+
+
+--------------------------------------------------------------------------------
+
+---
+
+PROMPT 40 — Export Forge (EPUB / PDF / DOCX)
+```
+You are an AI coding agent in "writers-room-x".
+GOAL
+Export the current book to EPUB, PDF, and DOCX, upload to Spaces, and return download links.
+CREATE / MODIFY
+1) /api/src/api/exporters/epub.py
+   - Build EPUB from manuscript markdown using ebooklib (or equivalent).
+2) /api/src/api/exporters/pdf.py
+   - Render HTML → PDF using WeasyPrint (or equivalent headless backend).
+3) /api/src/api/exporters/docx.py
+   - Build DOCX using python-docx; basic styles for headings/paragraphs.
+4) /api/src/api/routers/export.py
+   - GET /export/book?format=epub|pdf|docx -> {"key":"...", "cdn_url":"..."}
+5) /ui
+   - Export modal with format selection; show progress; link to CDN URL when ready.
+REQUIREMENTS
+- Normalized front matter (title, author) pulled from project config.
+- Respect scene order; table of contents included.
+ACCEPTANCE
+- All three formats generate without errors; files upload to Spaces; links open/download successfully.
+```
+---
+**Done.** You now have Prompts 21–40 refined and ready for copy/paste.
+
+
+--------------------------------------------------------------------------------
+
+
+PROMPT DD-01 — Implement the **Dialogue Demon** agent (precise dialogue-only rewrites)
+
+You are working inside the existing monorepo "writers-room-x".
+
+GOAL
+Create a new agent "Dialogue Demon" that rewrites ONLY dialogue spans to heighten voice, subtext, tension, and brevity, while preserving canon facts and scene intent.
+
+CONSTRAINTS
+- Modify text only INSIDE quotation marks. Support straight quotes "..." and smart quotes “...”, and single quotes where used for dialogue (‘...’). Do not alter narration outside those spans except minimal adjacent punctuation required for grammatical correctness.
+- Preserve proper nouns, dates, technical terms, and canon identifiers verbatim (e.g., "Central Core", named factions). If a change would alter any such token, skip that change and record a warning.
+- Respect character voice constraints:
+  - Use per-character `voice_tags`, `preferred_words`, and `banned_words`.
+  - Do not introduce words from `banned_words`.
+  - Allow longer lines only if `voice_tags` includes "rambling" or "formal"; otherwise prefer ≤ 18 words per dialogue line.
+- Increase subtext: remove on-the-nose explanations, reduce hedging, use implication. You may add em dashes (—) or ellipses (…) sparingly to imply interruption/hesitation.
+- Do not change plot events or factual assertions embedded in dialogue.
+
+IMPLEMENTATION (files to add/modify)
+1) Create `/api/src/api/agents/dialogue_demon.py` with:
+   - `def run_dialogue_pass(scene_text: str, character_map: dict, config: dict) -> dict:`
+     - `scene_text`: full scene markdown.
+     - `character_map`: mapping `{character_id: {name, voice_tags, preferred_words, banned_words}}`. If unknown speaker, treat voice-neutral.
+     - `config`: may include global banned terms and strict flags.
+     - Detect dialogue spans robustly (regex for paired quotes + fallback token scan). Support multiple spans per line and multiline dialogue.
+     - For each span, compute a revised line that:
+       - Preserves canon tokens (TitleCase tokens, known names, locations, systems).
+       - Moves toward brevity/subtext while keeping speaker intent.
+       - Avoids banned words; bias toward `preferred_words`.
+     - Return dict:
+       {
+         "diff": "<unified diff against original scene_text>",
+         "rationale": [3-6 bullet strings, concise],
+         "line_changes": [{"character":"<name or unknown>","changed":int,"shortened_avg":float}],
+         "warnings": [string...]
+       }
+     - If <2 dialogue spans are detected, return a no-op diff with rationale explaining skip.
+
+2) Update `/api/src/api/routers/passes.py`:
+   - Allow `"dialogue_demon"` in the accepted agent list.
+   - Include `dialogue_summary` (rationale, line_changes, warnings) in response JSON when present.
+
+3) Update `/api/src/api/configs/agents.yaml`:
+   ```
+   dialogue_demon:
+     model: "stylist-1"
+     tools: ["diff"]
+     temperature: 0.8
+   ```
+
+4) Update `/api/src/api/schemas.py`:
+   - Extend result schemas to include:
+     - `dialogue_summary: { rationale: List[str], line_changes: List[dict], warnings: List[str] }`.
+
+5) Add tests `/api/tests/test_dialogue_demon.py`:
+   - Seed a scene with mixed narration and multiple dialogue lines.
+   - Assert the diff modifies only quoted spans (no narration diffs).
+   - Assert named entities within spans (e.g., "Central Core") are unchanged.
+   - Assert no banned words appear.
+   - Assert diff applies cleanly using your existing `apply_unified_diff`.
+
+ACCEPTANCE
+- Running the test passes.
+- `POST /passes/run` with `agents=["dialogue_demon"]` returns a diff that touches only dialogues, plus a populated `dialogue_summary`.
+- Applying the diff via `/patches/apply` yields a successful commit.
+
+
+--------------------------------------------------------------------------------
+
+
+PROMPT DD-02 — Wire **Dialogue Demon** into Supervisor with strict proper-noun protection
+
+You are working inside "writers-room-x".
+
+GOAL
+Integrate Dialogue Demon into the supervisor pipeline and add a hard guard that prevents edits from altering canon tokens within dialogue.
+
+TASKS
+1) Modify `/api/src/api/agents/dialogue_demon.py`:
+   - Add function parameter `strict_proper_nouns: bool = True`.
+   - When `strict_proper_nouns` is True, detect canon tokens inside candidate spans based on:
+     - Known names/locations/factions from `character_map` and linked lore items (if available).
+     - TitleCase tokens.
+   - If a proposed change would alter any canon token’s characters (case-sensitive), skip the change for that span and append a warning entry `"blocked_change_due_to_canon"`.
+
+2) Modify `/api/src/api/agents/supervisor.py`:
+   - When `"dialogue_demon"` is requested:
+     - Fetch the scene text and any `char:*` entries from `Scene.links_json` to assemble `character_map`.
+     - Call `run_dialogue_pass(..., strict_proper_nouns=True)`.
+     - After receiving the diff, perform a secondary verification:
+       - Extract before/after for any TitleCase tokens and known canon tokens.
+       - If any token changed, remove that hunk from the diff and append a supervisor-level warning `"reverted_hunk_due_to_canon_violation"`.
+     - Attach `dialogue_summary` and warnings to the job result.
+
+3) Add tests `/api/tests/test_dialogue_demon_canon.py`:
+   - Dialogue: `"Meet at the Central Core at dawn."`
+   - Ensure the diff preserves `"Central Core"` exactly and contains either no edit for that substring or a reverted hunk warning.
+
+ACCEPTANCE
+- Tests pass.
+- Supervisor returns warnings when a hunk is reverted.
+- Final diffs never alter protected canon tokens.
+
+
+--------------------------------------------------------------------------------
+
+
+PROMPT PS-01 — Implement the **Pacing Surgeon** agent (tempo, paragraphing, hooks)
+
+You are working inside "writers-room-x".
+
+GOAL
+Create "Pacing Surgeon" to adjust scene tempo by manipulating sentence length distribution, paragraph breaks, whitespace, and hook placement—without altering facts or character voice.
+
+CONSTRAINTS
+- Do not change proper nouns, numeric facts, or canon identifiers.
+- Dialogue content should remain semantically intact; you may split lines at natural pauses (commas, em dashes, ellipses) but do not change word choice inside dialogue.
+- Keep token delta small: aim for <8% change. If your proposed edits exceed 8%, scale back and include a warning.
+- Target average sentence length using `configs/metrics.yaml` (e.g., ~13 words). Sentences >28 words are candidates for splitting.
+- Ensure first paragraph ends with a micro-hook and the last paragraph ends with forward momentum.
+
+IMPLEMENTATION (files to add/modify)
+1) Create `/api/src/api/agents/pacing_surgeon.py` with:
+   - `def run_pacing_pass(scene_text: str, metrics_cfg: dict, voice_cfg: dict) -> dict:`
+     - Compute before/after stats:
+       - sentence length histogram,
+       - average sentence length,
+       - paragraph count,
+       - dialogue proportion (estimate via quote detection).
+     - Edits allowed:
+       - split overly long sentences,
+       - merge run-on fragments if choppy,
+       - adjust paragraph breaks to improve flow,
+       - add minimal hook lines if missing (see hook policy below).
+       - normalize whitespace (single blank line between paragraphs; collapse >2 blanks to one).
+     - Return dict:
+       {
+         "diff": "<unified diff>",
+         "pacing_report": {
+           "sentence_len_before_hist": [...],
+           "sentence_len_after_hist": [...],
+           "avg_before": float, "avg_after": float,
+           "paragraphs_before": int, "paragraphs_after": int,
+           "hooks_added": [{"line": int, "text": str}]
+         },
+         "warnings": [string...]
+       }
+
+2) Update `/api/src/api/routers/passes.py` and `/api/src/api/schemas.py`:
+   - Allow `"pacing_surgeon"` agent.
+   - Include `pacing_report` and `warnings` in the response.
+
+3) Add tests `/api/tests/test_pacing_surgeon.py`:
+   - Provide a long paragraph with sentences >28 words.
+   - Assert average sentence length moves toward target.
+   - Assert token delta ≤ 8%.
+   - Assert named entities unchanged.
+
+ACCEPTANCE
+- Tests pass.
+- `POST /passes/run` with `agents=["pacing_surgeon"]` returns a valid diff and `pacing_report` reflecting improved pacing.
+
+
+--------------------------------------------------------------------------------
+
+
+PROMPT PS-02 — Enforce hook policy and whitespace safety for **Pacing Surgeon**
+
+You are working inside "writers-room-x".
+
+GOAL
+Harden Pacing Surgeon with explicit hook rules and whitespace normalization, and add tests for these behaviors.
+
+TASKS
+1) Update `/api/src/api/agents/pacing_surgeon.py`:
+   - Hook policy:
+     - Opening hook: ensure the last line of paragraph 1 ends with one of ["?", "—", "…"] OR ends on a vivid concrete noun. If not present, insert a 3–8 word hook line that implies tension without altering canon (e.g., "Something watches from the dark.").
+     - Closing hook: ensure the final paragraph ends on a pending motion, threat, or unresolved beat. If absent, append a 3–8 word line that pulls the reader forward (e.g., "The door doesn't stay shut.").
+   - Whitespace policy:
+     - Collapse any 2+ blank lines to one.
+     - Ensure exactly one blank line between paragraphs.
+     - Strip trailing spaces; preserve markdown formatting where present.
+
+2) Add tests `/api/tests/test_pacing_hooks.py`:
+   - Scene with no clear opening/closing hooks.
+   - Assert `hooks_added` includes entries for the inserted lines.
+   - Assert no canon tokens are introduced or modified.
+
+ACCEPTANCE
+- Tests pass and `hooks_added` entries reflect actual inserted lines with their line numbers.
+- Generated hooks are ≤ 8 words and do not add or modify canon facts.
+
+
+--------------------------------------------------------------------------------
+
+
+PROMPT PT-01 — Implement the **Plot Twister** agent (treatments + seed diffs)
+
+You are working inside "writers-room-x".
+
+GOAL
+Create "Plot Twister" that:
+1) Proposes 2–3 structural twist TREATMENTS aligned to configured milestones (8–11% and 50%).
+2) Optionally generates tiny SEED DIFFS (foreshadowing insertions) for the current scene when close to a milestone.
+
+RULES
+- Load `chapter_reversal_percent` from `/api/src/api/configs/project.yaml` (e.g., [8, 11, 50]).
+- Compute % through book for `scene_id`; if within ±2% of a target, allow seeds; otherwise, return treatments only.
+- Treatments must not contradict canon; they are conceptual proposals with beats, placement, and theme links.
+- Seeds must be 1–2 lines, ≤22 words per line, and evocative (no new hard facts). If a seed mentions named entities, run a lore safety scan and drop the seed if risky.
+- Never introduce dates, laws, or system names in seeds unless already present in the scene.
+
+IMPLEMENTATION (files to add/modify)
+1) Create `/api/src/api/agents/plot_twister.py` with:
+   - `def run_twister(scene_id: str, scene_text: str, scene_meta: dict, cfg: dict) -> dict:`
+     - Produce:
+       - `"treatments"`: list of 2–3 items like:
+         {
+           "id": "tw-<uuid>",
+           "type": "reversal|reveal|betrayal|arrival|deprivation",
+           "placement_pct": float,
+           "stakes_delta": "↑|↑↑",
+           "theme_link": str,
+           "beats": [str, str, str],
+           "setup_scenes": [scene_id...],
+           "payoff_scenes": [scene_id...],
+           "sample_paragraph": "80–120 words in project tone"
+         }
+       - `"diff"`: unified diff with optional seed insertions (or empty string if none).
+       - `"rationale"`: list of concise bullets explaining why these treatments fit this position in the book.
+
+2) Update supervisor safety:
+   - In `/api/src/api/agents/supervisor.py`, when `"plot_twister"` is requested:
+     - If a seed diff exists, run a read-only Lore Archivist scan on the inserted lines.
+     - If risky, remove those hunks and keep treatments only; add a warning.
+
+3) Update `/api/src/api/routers/passes.py` and `/api/src/api/schemas.py`:
+   - Include `treatments`, `twister_rationale`, and any `warnings` in API responses.
+
+4) Add tests `/api/tests/test_plot_twister.py`:
+   - Seed `project.yaml` with `[8, 11, 50]`.
+   - Place a scene near 10%: expect 2–3 treatments and possibly a seed diff containing only insertions.
+   - Place a scene far from milestones: expect treatments but no diff.
+
+ACCEPTANCE
+- Tests pass.
+- Twister returns high-signal treatments and any seed diff is insertion-only and lore-safe.
+
+
+--------------------------------------------------------------------------------
+
+
+PROMPT PT-02 — Add book-percent math and neighbor-scene utilities for **Plot Twister**
+
+You are working inside "writers-room-x".
+
+GOAL
+Provide utilities to compute a scene’s percent through the book and to fetch neighbor scenes to ground treatments.
+
+TASKS
+1) Create `/api/src/api/utils/book_math.py`:
+   - `def compute_scene_percent(scene_id: str) -> float`:
+     - Compute percent by summing word counts across all scenes in order and dividing cumulative words up to the end of the target scene by total words.
+     - Cache results for 1 hour (in-memory or Redis) keyed by scene content hash + scene order to avoid stale values.
+   - `def neighbor_scenes(scene_id: str, radius: int = 2) -> list[dict]`:
+     - Return up to `radius` previous and `radius` next scenes with `{id, chapter, order_in_chapter, word_count}`.
+
+2) Update `/api/src/api/agents/plot_twister.py`:
+   - Use `compute_scene_percent(scene_id)` to compute:
+     - `"closeness"` = {"percent": float, "nearest_target": float, "distance": float}
+   - Optionally reference `neighbor_scenes` to propose realistic `setup_scenes` and `payoff_scenes`.
+
+3) Add tests `/api/tests/test_book_math.py`:
+   - Seed 5–7 scenes with deterministic word counts.
+   - Assert percent increases monotonically and final scene ≈ 100%.
+   - Assert neighbor retrieval is correct at edges (first/last scene).
+
+ACCEPTANCE
+- Tests pass.
+- Plot Twister rationale includes `closeness` with accurate values.
+
+
+--------------------------------------------------------------------------------
+
+
+PROMPT INT-01 — Register agents, merge outputs, and produce **Safe/Bold** variants
+
+You are working inside "writers-room-x".
+
+GOAL
+Register the new agents (Dialogue Demon, Pacing Surgeon, Plot Twister), orchestrate them in the supervisor, and merge their diffs into coherent variants: SAFE and BOLD.
+
+TASKS
+1) Edit `/api/src/api/configs/agents.yaml` to include:
+   ```
+   dialogue_demon: { model: "stylist-1", tools: ["diff"], temperature: 0.8 }
+   pacing_surgeon: { model: "critic-1", tools: ["metrics","diff"], temperature: 0.4 }
+   plot_twister:   { model: "reasoner-1", tools: ["rag"], temperature: 0.5 }
+   ```
+
+2) Edit `/api/src/api/agents/supervisor.py`:
+   - Recognize agent names `"dialogue_demon"`, `"pacing_surgeon"`, `"plot_twister"`.
+   - Execution order for merging diffs:
+     - SAFE variant: apply `pacing_surgeon` diff first, then `dialogue_demon` diff.
+     - BOLD variant: start from SAFE, then (if Plot Twister provided a seed diff that passed lore safety) apply exactly one seed insertion hunk. If multiple seeds exist, choose the one with the strongest `stakes_delta`.
+   - If any hunk conflicts during merge, prefer Dialogue Demon’s change for dialogue spans and drop overlapping Pacing edits in that span; record a `"dropped_hunk_conflict"` warning.
+   - Attach:
+     - `dialogue_summary`
+     - `pacing_report`
+     - `treatments`, `twister_rationale`
+     - `warnings` (merge and seed decisions)
+     - `canon_receipts` for any seed that mentions a named entity.
+
+3) Update `/api/src/api/routers/passes.py` and `/api/src/api/schemas.py`:
+   - Ensure response payload includes the above fields for both `variants.safe` and `variants.bold`.
+
+ACCEPTANCE
+- Calling `POST /passes/run` with `agents=["pacing_surgeon","dialogue_demon","plot_twister"]` returns:
+  - `variants.safe` with merged pacing + dialogue diffs.
+  - `variants.bold` = SAFE + at most one seed insertion (when available).
+  - All associated reports and warnings present.
+- Diffs apply cleanly via `/patches/apply`.
+
+
+--------------------------------------------------------------------------------
+
+
+PROMPT INT-02 — Extend the UI to present Dialogue, Pacing, and Twister outputs
+
+You are working inside "writers-room-x" UI (/ui, Next.js 14 + Tailwind).
+
+GOAL
+Render the new agent outputs and annotate variant tabs with contributing agents.
+
+TASKS
+1) Update types in `/ui/lib/types.ts` to match the extended API:
+   - Add `dialogue_summary`, `pacing_report`, `treatments`, `twister_rationale`, and `warnings` types.
+
+2) Update scene page `/ui/app/scene/[id]/page.tsx`:
+   - Add three panels:
+     - Dialogue panel:
+       - Show `dialogue_summary.rationale` (bullets).
+       - Table of `line_changes` with columns: Character, Edited Lines, Avg Words Removed.
+       - Warnings list if present.
+     - Pacing panel:
+       - Render `pacing_report`:
+         - before/after average,
+         - simple bar histograms (no external chart libs required),
+         - paragraph counts,
+         - list `hooks_added`.
+       - Warnings list if present.
+     - Twister panel:
+       - List `treatments` with type, `placement_pct`, beats, and a collapsible `sample_paragraph`.
+       - If the current variant includes a twister seed, show a badge: `Seeded: <treatment id>`.
+
+3) Variant tabs (Safe / Bold / Red-Team if present):
+   - Display chips for contributing agents (e.g., PACING, DIALOGUE, TWISTER).
+   - Clicking a chip scrolls to the corresponding panel.
+
+4) Wire API calls (if not already):
+   - Load scene metadata + text.
+   - Trigger run pass → poll for result → render panels and diffs.
+   - Apply patch with confirmation dialog.
+
+ACCEPTANCE
+- Running a pass with the three agents populates all panels.
+- Variant tabs show agent chips; clicking chips jumps to panels.
+- Apply Patch works end-to-end.
+
+
+--------------------------------------------------------------------------------
+
+
+PROMPT INT-03 — Extend nightly batch to use Pacing + Twister intelligently
+
+You are working inside "writers-room-x".
+
+GOAL
+Modify the nightly batch endpoint to schedule agents based on proximity to reversal milestones and generate a chapter-level HTML report.
+
+TASKS
+1) Update `/api/src/api/routers/batch.py`:
+   - For any scene within ±2% of a configured reversal target (from `project.yaml`), enqueue agents: `["plot_twister","pacing_surgeon"]`.
+   - For all other scenes, enqueue: `["pacing_surgeon"]`.
+   - Aggregate results by chapter:
+     - Pacing deltas (avg sentence length before→after, paragraph count deltas).
+     - List of proposed treatments (by type and `placement_pct`).
+     - Seeds that were actually applied (include treatment id).
+   - Render a minimal HTML report and upload to Spaces at `artifacts/reports/<YYYY-MM-DD>.html`.
+   - Require header `X-CRON-KEY` matching `CRON_KEY` env.
+
+2) No changes to the DO Function; it already POSTs to `/batch/nightly`.
+
+ACCEPTANCE
+- Hitting the batch endpoint with a valid header produces an HTML report in Spaces reflecting the above data.
+- Scenes near 8–11% and 50% milestones include Twister proposals; others do not.
+
+
+--------------------------------------------------------------------------------
+
+
+PROMPT TEST-BUNDLE — End-to-end tests covering the three agents and merge logic
+
+You are working inside "writers-room-x".
+
+GOAL
+Provide integration tests that validate Dialogue Demon, Pacing Surgeon, Plot Twister, and supervisor merge behavior.
+
+TASKS
+1) Add `/api/tests/test_agents_trio_e2e.py`:
+   - Seed 5–7 scenes with known word counts so that:
+     - Scene 3 ≈ 10% of total words,
+     - Scene 5 ≈ 50% of total words.
+   - Run four passes:
+     a) ["dialogue_demon"] → assert diffs only modify quoted spans; assert canon tokens preserved.
+     b) ["pacing_surgeon"] → assert avg sentence length moves toward target; ≤8% token delta; hooks added at start/end if absent.
+     c) ["plot_twister"] for Scene 3 → assert 2–3 treatments returned; seed diff present OR empty depending on proximity; any seed is insertion-only.
+     d) ["pacing_surgeon","dialogue_demon","plot_twister"] → assert:
+        - `variants.safe` includes pacing+dialogue merged without conflict in dialogue spans.
+        - `variants.bold` includes at most one seed insertion; if seed removed by lore safety, warn and no seed applied.
+        - `/patches/apply` applies both variants cleanly (when chosen).
+
+ACCEPTANCE
+- `pytest -q` passes all tests.
+- Merge rules (pacing before dialogue; seed after SAFE) are verifiably enforced.

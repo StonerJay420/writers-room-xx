@@ -1,0 +1,4 @@
+supervisor: {model: "reasoner-1", max_tokens: 4000}
+lore_archivist: {model: "reasoner-1", tools: ["rag","citations"], temperature: 0.3}
+grim_editor: {model: "stylist-1", tools: ["diff","metrics"], temperature: 0.7}
+tone_metrics: {model: "critic-1", tools: ["metrics"], temperature: 0.2}
