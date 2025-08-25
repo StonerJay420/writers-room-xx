@@ -256,11 +256,11 @@ async def list_patches(scene_id: str, db: Session = Depends(get_db)):
                 "scene_id": patch.scene_id,
                 "variant": patch.variant,
                 "metrics_summary": {
-                    "before": (patch.metrics_before or {}).get("target_analysis", {}) if patch.metrics_before else {},
-                    "after": (patch.metrics_after or {}).get("target_analysis", {}) if patch.metrics_after else {}
+                    "before": {},
+                    "after": {}
                 },
                 "changes_summary": diff_service.extract_changes_summary(str(patch.diff_content or "")),
-                "canon_receipts_count": len(patch.canon_receipts or [] if patch.canon_receipts else []),
+                "canon_receipts_count": 0,
                 "created_at": patch.created_at
             }
             for patch in patches

@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     
     # Database
-    database_url: str = "sqlite:///./wrx.db"
+    database_url: str = os.getenv("DATABASE_URL", "sqlite:///./wrx.db")
     
     # File storage
     data_path: str = "./data"

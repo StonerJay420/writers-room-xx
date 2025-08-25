@@ -46,9 +46,14 @@ async def index_files(
                 
                 if existing_scene:
                     # Update existing scene
-                    update_data = scene_meta.copy()
-                    update_data["content"] = content
-                    db.query(Scene).filter(Scene.id == scene_meta["id"]).update(update_data)
+                    existing_scene.chapter = scene_meta.get("chapter")
+                    existing_scene.order_in_chapter = scene_meta.get("order_in_chapter") 
+                    existing_scene.pov = scene_meta.get("pov")
+                    existing_scene.location = scene_meta.get("location")
+                    existing_scene.text_path = scene_meta.get("text_path")
+                    existing_scene.beats_json = scene_meta.get("beats_json")
+                    existing_scene.links_json = scene_meta.get("links_json")
+                    existing_scene.content = content
                 else:
                     # Create new scene
                     scene = Scene(
