@@ -27,7 +27,8 @@ class AIService:
         agent_name: str,
         prompt: str,
         context: Dict[str, Any] = None,
-        scene_text: str = None
+        scene_text: str = None,
+        custom_model: str = None
     ) -> Dict[str, Any]:
         """Call a specific AI agent with the given prompt."""
         
@@ -41,15 +42,24 @@ class AIService:
                 "max_tokens": 2000
             }
         
-        # Map agent model names to OpenRouter models
-        model_mapping = {
-            "reasoner-1": "anthropic/claude-3-opus",
-            "stylist-1": "openai/gpt-4-turbo-preview", 
-            "critic-1": "anthropic/claude-3-sonnet",
-            "gpt-5": "openai/gpt-4-turbo-preview"  # Fallback since GPT-5 not available
-        }
-        
-        model = model_mapping.get(agent_config.get("model"), "openai/gpt-4-turbo-preview")
+        # Use custom model if provided, otherwise check preferences
+        if custom_model:
+            model = custom_model
+        else:
+            # Import here to avoid circular dependency
+            from ..routers.models import model_preferences
+            
+            # Get model from preferences based on agent name
+            if agent_name == "lore_archivist":
+                model = model_preferences.lore_archivist
+            elif agent_name == "grim_editor":
+                model = model_preferences.grim_editor
+            elif agent_name == "tone_metrics":
+                model = model_preferences.tone_metrics
+            elif agent_name == "supervisor":
+                model = model_preferences.supervisor
+            else:
+                model = "openai/gpt-4-turbo-preview"
         
         # Build the system prompt based on agent type
         system_prompt = self._build_system_prompt(agent_name, context)

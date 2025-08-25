@@ -173,6 +173,7 @@ def index_files(paths: List[str], reindex: bool = False) -> Dict[str, int]:
     # Discover files
     files = discover_files(paths)
     results['indexed_docs'] = len(files)
+    print(f"Found {len(files)} files to index: {[str(f) for f in files]}")
     
     # Process each file
     with next(get_write_session()) as db:
