@@ -44,9 +44,10 @@ class ChromaClient:
         # Convert embeddings to list format if needed
         if isinstance(embeddings, np.ndarray):
             if len(embeddings.shape) == 1:
-                embeddings = [embeddings.tolist()]
+                embeddings_list = [embeddings.tolist()]
             else:
-                embeddings = embeddings.tolist()
+                embeddings_list = embeddings.tolist()
+            embeddings = embeddings_list
         
         # Upsert to collection
         coll.upsert(
@@ -60,8 +61,8 @@ class ChromaClient:
     def query(
         self,
         collection: str,
-        query_text: str = None,
-        query_embedding: np.ndarray = None,
+        query_text: Optional[str] = None,
+        query_embedding: Optional[np.ndarray] = None,
         top_k: int = 10,
         filters: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
@@ -94,14 +95,14 @@ class ChromaClient:
             if isinstance(query_embedding, np.ndarray):
                 query_embedding = query_embedding.tolist()
             query_params["query_embeddings"] = [query_embedding]
-        elif query_text:
+        elif query_text is not None:
             query_params["query_texts"] = [query_text]
         else:
             raise ValueError("Either query_text or query_embedding must be provided")
         
         # Add filters if provided
         if filters:
-            query_params["where"] = filters
+            query_params["where"] = filters  # type: ignore
         
         # Execute query
         results = coll.query(**query_params)
