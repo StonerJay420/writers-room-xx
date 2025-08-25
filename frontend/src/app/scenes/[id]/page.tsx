@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { Scene, Patch, PassResult } from '@/types'
+import { SceneDetail, Patch, PassResult } from '@/types'
 import { api } from '@/lib/api'
 import { DiffViewer } from '@/components/DiffViewer'
 import { MetricsPanel } from '@/components/MetricsPanel'
@@ -13,7 +13,7 @@ export default function ScenePage() {
   const params = useParams()
   const sceneId = params.id as string
   
-  const [scene, setScene] = useState<Scene | null>(null)
+  const [scene, setScene] = useState<SceneDetail | null>(null)
   const [patches, setPatches] = useState<Patch[]>([])
   const [selectedVariant, setSelectedVariant] = useState<string>('safe')
   const [loading, setLoading] = useState(true)
@@ -29,7 +29,25 @@ export default function ScenePage() {
 
   const loadScene = async () => {
     try {
-      const sceneData = await api.get(`/scenes/${sceneId}`)
+      const response = await api.get<{ id: string; text: string; path: string }>(`/scenes/${sceneId}`)
+      
+      // Transform API response to match SceneDetail interface
+      const sceneData: SceneDetail = {
+        meta: {
+          id: response.id,
+          chapter: parseInt(response.id.match(/ch(\d+)/)?.[1] || '1'),
+          order_in_chapter: parseInt(response.id.match(/s(\d+)/)?.[1] || '1'),
+          pov: 'Unknown', // These would need to come from scene metadata
+          location: 'Unknown',
+          text_path: response.path,
+          beats_json: [],
+          links_json: [],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        },
+        content: response.text
+      }
+      
       setScene(sceneData)
     } catch (error) {
       console.error('Failed to load scene:', error)
@@ -38,7 +56,7 @@ export default function ScenePage() {
 
   const loadPatches = async () => {
     try {
-      const patchesData = await api.get(`/patches/${sceneId}`)
+      const patchesData = await api.get<Patch[]>(`/patches/${sceneId}`)
       setPatches(patchesData)
       setLoading(false)
     } catch (error) {
@@ -50,7 +68,7 @@ export default function ScenePage() {
   const runPass = async () => {
     try {
       setProcessing(true)
-      const result = await api.post('/passes/run', {
+      const result = await api.post<{ result: PassResult }>('/passes/run', {
         scene_id: sceneId,
         agents: ['lore_archivist', 'grim_editor'],
         edge_intensity: 1
@@ -68,7 +86,7 @@ export default function ScenePage() {
 
   const applyPatch = async () => {
     try {
-      await api.post('/patches/apply', {
+      await api.post<void>('/patches/apply', {
         scene_id: sceneId,
         variant: selectedVariant,
         commit_message: `Apply ${selectedVariant} patch for ${sceneId}`
