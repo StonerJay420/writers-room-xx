@@ -56,6 +56,7 @@ from .routers import ingest_router, scenes_router
 from .routers.models import router as models_router
 from .routers.patches import router as patches_router
 from .routers.reports import router as reports_router
+from .routers.search import router as search_router
 
 # Include routers
 app.include_router(ingest_router, prefix="/api")
@@ -63,3 +64,4 @@ app.include_router(scenes_router, prefix="/api")
 app.include_router(models_router, prefix="/api")
 app.include_router(patches_router, prefix="/api")
 app.include_router(reports_router, prefix="/api")
+app.include_router(search_router, prefix="/api")

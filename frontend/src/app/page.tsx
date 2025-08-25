@@ -145,35 +145,35 @@ export default function Home() {
   const chapters = [...new Set(scenes.map(s => s.chapter))].sort((a, b) => a - b)
 
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100">
+    <div className="min-h-screen bg-dark-bg text-gray-100">
       <div className="container mx-auto px-4 py-8">
         <div className="space-y-6">
           {/* Header */}
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+              <h1 className="text-5xl font-display font-bold gradient-text animate-glow">
                 Writers Room X
               </h1>
-              <p className="text-gray-400 mt-2">Multi-Agent AI Manuscript Editor</p>
+              <p className="text-neon-cyan/60 mt-2 font-mono text-sm">Multi-Agent AI Manuscript Editor</p>
             </div>
             <div className="flex space-x-3">
               <button
                 onClick={() => setShowSettings(!showSettings)}
-                className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-750 transition-colors flex items-center space-x-2"
+                className="neon-button rounded-lg flex items-center space-x-2"
               >
                 <Settings size={16} />
                 <span>Agent Models</span>
               </button>
               <button
                 onClick={() => setShowUpload(!showUpload)}
-                className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-750 transition-colors flex items-center space-x-2"
+                className="neon-button rounded-lg flex items-center space-x-2"
               >
                 <Upload size={16} />
                 <span>Upload</span>
               </button>
               <button
                 onClick={handleIndexFiles}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+                className="px-4 py-2 bg-gradient-to-r from-neon-purple to-neon-pink hover:from-neon-pink hover:to-neon-purple rounded-lg transition-all duration-300 shadow-neon-purple"
               >
                 Index Files
               </button>
@@ -182,9 +182,9 @@ export default function Home() {
 
           {/* Model Settings */}
           {showSettings && (
-            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                <Brain className="w-5 h-5 text-purple-400" />
+            <div className="neon-card rounded-lg p-6 hologram-effect">
+              <h2 className="text-xl font-display font-semibold mb-4 flex items-center gap-2 neon-text">
+                <Brain className="w-5 h-5 text-neon-purple" />
                 Agent Model Configuration
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -234,8 +234,8 @@ export default function Home() {
 
           {/* Upload Component */}
           {showUpload && (
-            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-              <h2 className="text-lg font-semibold mb-4">Upload Files</h2>
+            <div className="neon-card rounded-lg p-6">
+              <h2 className="text-lg font-display font-semibold mb-4 neon-text">Upload Files</h2>
               <FileUpload onUploadComplete={() => {
                 loadScenes()
                 setShowUpload(false)
@@ -244,7 +244,7 @@ export default function Home() {
           )}
 
           {/* Filters */}
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+          <div className="neon-card rounded-lg p-4">
             <div className="flex space-x-4">
               <div>
                 <label className="block text-sm font-medium text-gray-400 mb-1">
@@ -253,7 +253,7 @@ export default function Home() {
                 <select
                   value={selectedChapter || ''}
                   onChange={(e) => setSelectedChapter(e.target.value ? parseInt(e.target.value) : null)}
-                  className="bg-gray-700 border border-gray-600 text-gray-200 rounded-md px-3 py-1"
+                  className="neon-input rounded-md px-3 py-1"
                 >
                   <option value="">All Chapters</option>
                   {chapters.map(ch => (
@@ -270,7 +270,7 @@ export default function Home() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search scenes..."
-                  className="w-full bg-gray-700 border border-gray-600 text-gray-200 rounded-md px-3 py-1 placeholder-gray-500"
+                  className="w-full neon-input rounded-md px-3 py-1 placeholder-gray-500"
                 />
               </div>
             </div>

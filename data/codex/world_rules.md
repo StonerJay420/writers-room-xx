@@ -1,35 +1,25 @@
----
-type: codex
-category: world_building
----
+# World Rules & Canon
 
-# World Rules and Lore
+## Quantum Consciousness Theory
+- Consciousness exists as quantum information
+- Can be transferred between entangled particles
+- Limited by Heisenberg uncertainty principle
+- Observation collapses the wave function
 
-## The Artifact
-- Ancient device of unknown origin
-- Responds only to specific bloodlines
-- Can reveal hidden truths but at a cost
-- Fragments scattered across three locations
+## The Convergence Event
+- Occurred at exactly 2:47 AM EST
+- Affected all quantum research facilities globally
+- Created permanent quantum entanglement between certain individuals
+- Cannot be reversed, only controlled
 
-## The Guardians
-- Secret society established in 1823
-- Each generation selects one keeper per bloodline
-- Bound by oath to protect, never to use
-- Knowledge passed through encrypted journals
+## Technology Level
+- Near future (2035)
+- Quantum computers are common in research
+- AR/VR fully integrated into daily life
+- Space: Mars colony established, no FTL
+- Medical: Gene therapy common, no consciousness upload yet
 
-## The Warehouse District
-- Built over ancient ruins
-- Natural dampening field for artifact energy
-- Six hidden chambers, only three discovered
-- Protected by both technology and tradition
-
-## Rules of Engagement
-1. The artifact cannot be destroyed, only contained
-2. Direct contact triggers visions of possible futures
-3. Prolonged exposure causes temporal displacement
-4. Two bloodlines must be present to fully activate
-
-## Consequences
-- Each use of the artifact fractures reality slightly
-- Visions become more vivid but less reliable over time
-- The keeper always knows when the artifact is accessed
+## Organizations
+- **FBI Paranormal Division:** Handles unexplained phenomena
+- **Quantum Ethics Council:** International oversight body
+- **The Collective:** Secret group aware of consciousness transfer

@@ -1,28 +1,25 @@
----
-type: codex
-category: characters
----
-
-# Character Profiles
+# Character Codex
 
 ## Sarah Chen
-- **Age**: 28
-- **Occupation**: Archivist at the Metropolitan Library
-- **Background**: Raised by her grandfather after her parents disappeared when she was seven
-- **Personality**: Curious, methodical, brave when necessary
-- **Voice**: Direct, observational, occasionally sarcastic
-- **Arc**: From skeptic to believer, from isolated to connected
+- **Age:** 34
+- **Occupation:** Quantum Physicist, MIT
+- **Personality:** Brilliant, obsessive, driven
+- **Background:** Lost her parents in a plane crash at 16, threw herself into science
+- **Voice:** Technical, precise, occasionally sarcastic when stressed
+- **Arc:** From isolated scientist to reluctant world-saver
 
 ## Marcus Rivera
-- **Age**: 32
-- **Occupation**: Private Investigator (formerly military intelligence)
-- **Background**: Third generation guardian of the warehouse district secrets
-- **Personality**: Protective, guilt-ridden, strategic thinker
-- **Voice**: Measured, careful with words, dry humor under stress
-- **Arc**: From guardian to guide, from duty-bound to choice-driven
+- **Age:** 36  
+- **Occupation:** FBI Special Agent, Paranormal Division
+- **Personality:** Protective, methodical, skeptical
+- **Background:** Former Marine, recruited by FBI after classified incident in Afghanistan
+- **Voice:** Direct, military precision, dry humor
+- **Arc:** From skeptic to believer, must reconcile duty with love
 
-## The Keeper
-- **Age**: Unknown (appears elderly)
-- **Role**: Guardian of the artifact's knowledge
-- **Personality**: Cryptic, patient, subtly manipulative
-- **Voice**: Formal, archaic speech patterns, speaks in riddles
+## Dr. Harrison
+- **Age:** 58
+- **Occupation:** Department Head, MIT Quantum Research
+- **Personality:** Cautious, political, secretly ambitious
+- **Background:** Career academic, knows more than he admits
+- **Voice:** Formal, academic, sometimes condescending
+- **Arc:** From mentor to potential antagonist
