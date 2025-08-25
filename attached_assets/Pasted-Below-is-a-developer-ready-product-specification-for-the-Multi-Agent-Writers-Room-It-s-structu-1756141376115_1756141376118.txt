@@ -1,0 +1,616 @@
+Below is a developer-ready product specification for the **Multi-Agent Writers’ Room**. It’s structured so an engineer can scope, build, and ship an MVP that scales.
+
+# 0) One-Pager (Executive Summary)
+
+**Goal:** Build a multi-agent system that ingests a novel’s codex + manuscript, runs specialized AI agents (Lore, Plot, Dialogue, Line Edit, Pacing, Metrics, Red-Team), and returns ranked patch options (diffs) with canon citations and a metrics report aligned to the project’s house style (ED targets).
+
+**Primary Outcomes**
+
+* Side-by-side review UI: Original vs. Safe/Bold/Red-Team patches
+* Canon receipts: clickable line references for every change that touches lore
+* Style/metrics enforcement against predefined targets
+* Git-backed versioning and one-click patch application
+
+**MVP Scope (6–8 weeks)**
+
+* Two core agents: Lore Archivist (RAG) + Grim Editor (line edits)
+* Supervisor orchestration + diff composer
+* ED metrics (subset): Flesch, avg sentence length, active verb ratio
+* Chroma vector store + SQLite metadata
+* Simple Next.js UI for review/apply
+
+---
+
+# 1) Personas & Use Cases
+
+**Primary User:** Author/Editor who uploads manuscript + codex, requests critiques/rewrites per scene, and applies patches.
+
+**Core Use Cases**
+
+1. Ingest codex/manuscript; index scenes and character sheets
+2. Run an agent pass on a scene
+3. Compare Original vs. patch variants; view canon receipts & metrics
+4. Apply a selected patch; commit change to Git
+5. Export a consolidated report for a chapter/book
+
+---
+
+# 2) System Architecture
+
+## 2.1 High-Level Diagram (described)
+
+* **Client** (Next.js): review UI
+* **API** (FastAPI): orchestration endpoints
+* **Orchestrator** (LangGraph/AutoGen): agent routing, tool calls
+* **LLM Providers** (OpenRouter): per-agent model routing
+* **RAG**: Chroma (vectors), SQLite/Postgres (metadata)
+* **Storage**: Git repo for manuscript, codex, and patches
+* **Metrics service**: Python module (textstat, spacy/nltk)
+
+## 2.2 Tech Stack
+
+* **Backend:** Python 3.11+, FastAPI, LangGraph (or AutoGen)
+* **Frontend:** Next.js (App Router), Tailwind
+* **Vector DB:** Chroma
+* **Relational DB:** SQLite (MVP) → Postgres (scale)
+* **Models:** OpenRouter (configurable per agent)
+* **Auth:** API key (MVP) → OAuth (later)
+* **Containerization:** Docker + docker-compose
+* **CI/CD:** GitHub Actions
+
+---
+
+# 3) Data Model
+
+## 3.1 Files & Repo Layout
+
+```
+/repo-root
+  /codex/
+    characters/*.md
+    factions/*.md
+    locations/*.md
+    systems/*.md
+  /manuscript/
+    ch01/
+      ch01_s01.md
+      ch01_s02.md
+    ch02/...
+  /configs/
+    agents.yaml
+    metrics.yaml
+    project.yaml
+  /artifacts/
+    embeddings/
+    patches/
+    reports/
+```
+
+## 3.2 Scene Metadata (SQLite: `scenes`)
+
+```sql
+CREATE TABLE scenes (
+  id TEXT PRIMARY KEY,            -- "ch02_s03"
+  chapter INTEGER,
+  order_in_chapter INTEGER,
+  pov TEXT,
+  location TEXT,
+  text_path TEXT,                 -- "manuscript/ch02/ch02_s03.md"
+  beats_json TEXT,                -- JSON array of beats
+  links_json TEXT,                -- ["char:MC","faction:enforcers"]
+  created_at DATETIME,
+  updated_at DATETIME
+);
+```
+
+## 3.3 Characters (SQLite: `characters`)
+
+```sql
+CREATE TABLE characters (
+  id TEXT PRIMARY KEY,            -- "char:MC"
+  name TEXT,
+  voice_tags_json TEXT,           -- ["dry","observant"]
+  preferred_words_json TEXT,      -- ["static","slag","hiss"]
+  banned_words_json TEXT,         -- ["neon","echoes"]
+  arc_flags_json TEXT,            -- ["trust-issues↑"]
+  canon_quotes_json TEXT,         -- ["ch01_s01@L13-20"]
+  updated_at DATETIME
+);
+```
+
+## 3.4 Vectors
+
+* **Collections:** `codex_docs`, `manuscript_scenes`
+* **Embedding metadata:** `{source_type: 'codex'|'scene', id, chapter, character_ids, tags}`
+
+---
+
+# 4) Configuration
+
+## 4.1 Agents Routing (`configs/agents.yaml`)
+
+```yaml
+supervisor:
+  model: "reasoner-1"
+  max_tokens: 4000
+
+lore_archivist:
+  model: "reasoner-1"
+  tools: ["rag","citations"]
+  temperature: 0.3
+
+grim_editor:
+  model: "stylist-1"
+  tools: ["diff","metrics"]
+  temperature: 0.7
+
+dialogue_demon:
+  model: "stylist-1"
+  tools: ["diff"]
+  temperature: 0.8
+
+plot_twister:
+  model: "reasoner-1"
+
+tone_metrics:
+  model: "critic-1"
+  tools: ["metrics"]
+
+red_team:
+  model: "stylist-1"
+  temperature: 0.9
+```
+
+## 4.2 ED Metrics (`configs/metrics.yaml`)
+
+```yaml
+readability:
+  flesch_reading_ease: {target: 80, min: 75, max: 88}
+lexicon:
+  common_words_pct: {target: 81, min: 78, max: 85}
+  complex_words_pct: {target: 7, min: 5, max: 9}
+  unique_words_pct: {target: 48, min: 45, max: 52}
+  avg_word_len: {target: 4.1, min: 3.9, max: 4.3}
+verbs:
+  active_pct: {target: 98, min: 95, max: 99}
+  auxiliary_pct: {target: 12, min: 8, max: 17}
+  continuous_pct: {target: 12, min: 8, max: 15}
+sentences:
+  avg_len: {target: 13, min: 9.7, max: 15.6}
+dialogue:
+  proportion_pct: {target: 42, min: 9, max: 76}
+pace:
+  score: {target: 47, min: 40, max: 57}
+affect:
+  overall_tone: {target: -0.3, min: -0.4, max: -0.1}
+  anger_pct: {target: 38, min: 33, max: 45}
+  fear_pct: {target: 40, min: 34, max: 47}
+  happiness_pct: {target: 41, min: 34, max: 47}
+  disgust_pct: {target: 16, min: 13, max: 20}
+  surprise_pct: {target: 40, min: 34, max: 46}
+  sadness_pct: {target: 31, min: 27, max: 36}
+  neutral_pct: {target: 16, min: 14, max: 18}
+pos:
+  nouns_pct: {target: 19, min: 17, max: 23}
+  verbs_pct: {target: 21, min: 19, max: 24}
+  adjectives_pct: {target: 6, min: 4, max: 7}
+  adverbs_pct: {target: 8, min: 6, max: 10}
+  pronouns_pct: {target: 15, min: 11, max: 18}
+  other_pct: {target: 30, min: 27, max: 33}
+```
+
+## 4.3 Project Settings (`configs/project.yaml`)
+
+```yaml
+edge_intensity: 1        # 0..3
+patch_variants: ["safe","bold","red_team"]
+chapter_reversal_percent: [8,11,50]
+banned_global: ["neon","echoes","symphony"]
+```
+
+---
+
+# 5) API Design (FastAPI)
+
+## 5.1 Authentication
+
+* Header: `Authorization: Bearer <API_KEY>`
+
+## 5.2 Endpoints
+
+**POST `/ingest/index`**
+
+* Body: `{ "paths": ["codex/","manuscript/"], "reindex": true }`
+* Action: Load files, create/update scene/character records, embed text, upsert to Chroma.
+* Returns: `{ indexed_docs: N, scenes: M }`
+
+**GET `/scenes`**
+
+* Query: `chapter`, `search`
+* Returns: list of scene metadata
+
+**GET `/scenes/{scene_id}`**
+
+* Returns: `{ meta, text }`
+
+**POST `/passes/run`**
+
+* Body:
+
+```json
+{
+  "scene_id": "ch02_s03",
+  "agents": ["lore_archivist","grim_editor","tone_metrics"],
+  "edge_intensity": 1
+}
+```
+
+* Returns: job id
+
+**GET `/passes/{job_id}/result`**
+
+* Returns:
+
+```json
+{
+  "scene_id": "ch02_s03",
+  "variants": {
+    "safe": {...}, "bold": {...}, "red_team": {...}
+  },
+  "reports": {
+    "metrics": {...}, "canon_receipts": [ ... ],
+    "rationales": { "lore_archivist": "...", "grim_editor": "..." }
+  }
+}
+```
+
+**POST `/patches/apply`**
+
+* Body:
+
+```json
+{
+  "scene_id": "ch02_s03",
+  "variant": "safe",
+  "commit_message": "Apply safe patch for ch02_s03"
+}
+```
+
+* Applies unified diff, writes file, commits to Git
+* Returns: `{ status: "ok", commit_sha: "..." }`
+
+**GET `/reports/chapter/{chapter}`**
+
+* Consolidated PDF/HTML of metrics, changes, receipts
+
+---
+
+# 6) Agent Prompts (MVP)
+
+## 6.1 Supervisor
+
+**System:**
+
+* You coordinate specialized agents to improve a single scene. Goals: respect canon, improve clarity/flow, meet metrics. Produce 1–3 patch variants (safe, bold, optional red\_team). Each change that affects lore must include a canon receipt: doc id + line range.
+
+**Plan Template Returned:**
+
+```json
+{
+  "tasks":[
+    {"agent":"lore_archivist","purpose":"canon check + alternatives"},
+    {"agent":"grim_editor","purpose":"line edit + diff"},
+    {"agent":"tone_metrics","purpose":"score + minimal nudges"}
+  ],
+  "success_criteria":[
+    "No canon violations",
+    "Readability within target bands",
+    "Unified diff only"
+  ]
+}
+```
+
+## 6.2 Lore Archivist (RAG)
+
+**System:**
+
+* Retrieve up to 12 relevant codex/manuscript chunks. For each proposed change, confirm canon compliance. If conflict, block and propose a canon-safe alternative. Output JSON + optional diff.
+
+**Output:**
+
+```json
+{
+  "findings":[
+    {"issue":"Energy Core naming mismatch",
+     "receipt":{"source":"codex/systems/energy_core.md","lines":"L45-L63"},
+     "resolution":"Use 'Central Core' or update codex"}
+  ],
+  "diff":"...unified diff..."
+}
+```
+
+## 6.3 Grim Editor (Line Edits)
+
+**System:**
+
+* Preserve meaning and plot beats. Improve clarity, rhythm, specificity; reduce redundancy. Do not alter canon facts. Return unified diff only and a 3-bullet rationale.
+
+## 6.4 Tone & Metrics
+
+**System:**
+
+* Score passage vs. `metrics.yaml`. Suggest minimal changes to enter target ranges. Return: JSON metrics + a small diff to correct outliers.
+
+---
+
+# 7) Diff & Patch Format
+
+**Unified Diff Example**
+
+```diff
+--- a/manuscript/ch02/ch02_s03.md
++++ b/manuscript/ch02/ch02_s03.md
+@@ -1,6 +1,6 @@
+-The acrid stench of burning plastic jolts me awake.
++The stink of burning plastic snaps me upright.
+ Another power surge ripples through the Undercity.
+-Another night in this hollow mockery of home.
++Just another night in a hollowed-out home.
+```
+
+**Patch Artifact (`/artifacts/patches/ch02_s03_safe.patch`)**
+
+```json
+{
+  "scene_id":"ch02_s03",
+  "variant":"safe",
+  "diff_path":"artifacts/patches/ch02_s03_safe.diff",
+  "canon_receipts":[{"source":"codex/systems/energy_core.md","lines":"L12-L24"}],
+  "metrics_before":{...},
+  "metrics_after":{...}
+}
+```
+
+---
+
+# 8) Frontend (Next.js) Requirements
+
+## 8.1 Pages
+
+* `/` Scenes list: filter by chapter, search by keyword
+* `/scene/[id]` Review:
+
+  * Left: Original (line numbers)
+  * Middle Tabs: Safe / Bold / Red-Team (applied diff visualization)
+  * Right Panel:
+
+    * Metrics (before/after, red/yellow/green vs. targets)
+    * Canon Receipts (click to view snippet)
+    * Agent Rationales (accordion)
+  * Footer: **Apply Patch** (select variant) → modal confirm → API call
+
+## 8.2 Components
+
+* `DiffViewer` (monaco or react-diff-viewer)
+* `MetricsPanel` (radial/bars)
+* `ReceiptsList` (popover showing source lines)
+* `Notifications` (job running, done, error)
+
+---
+
+# 9) Jobs & Orchestration
+
+## 9.1 Job Model
+
+```sql
+CREATE TABLE jobs (
+  id TEXT PRIMARY KEY,
+  scene_id TEXT,
+  status TEXT,           -- queued|running|done|error
+  agents_json TEXT,      -- ["lore_archivist","grim_editor"]
+  result_json TEXT,
+  created_at DATETIME,
+  updated_at DATETIME
+);
+```
+
+## 9.2 Flow
+
+1. Client `POST /passes/run` → create job (status=queued)
+2. Worker consumes queue (RQ/Celery or simple background task)
+3. Supervisor builds plan → executes agent calls (parallel where safe)
+4. Aggregate outputs → compose variants → write artifacts → status=done
+
+---
+
+# 10) Evaluation & Acceptance Criteria
+
+## 10.1 Functional Acceptance (MVP)
+
+* Can index ≥ 100 codex/manuscript files in < 5 min locally
+* Can run a pass on a 2k-word scene and return:
+
+  * 1–2 patch variants with unified diffs
+  * Metrics JSON before/after with at least 6 ED metrics
+  * At least 1 canon receipt when a fact is touched
+* UI can render diffs, receipts, metrics, and apply a patch to disk + commit
+
+## 10.2 Quality Goals
+
+* Canon violation rate in test suite < 2% (seeded contradictions)
+* Metrics drift after “safe” patch stays within 90% of target bands
+* Round-trip latency for 2 agents < 90 seconds on average (model-dependent)
+
+---
+
+# 11) Testing Plan
+
+## 11.1 Unit
+
+* Tokenization & chunking
+* Embedding & retrieval relevance (top-k overlap)
+* Diff application idempotency
+
+## 11.2 Integration
+
+* Seed codex with deliberate contradictions; ensure Lore blocks/rewrites
+* Feed stylistic outliers; ensure Metrics nudges into bounds
+* End-to-end: ingest → pass → review → apply → git commit
+
+## 11.3 Datasets (Internal)
+
+* **Canon test pack:** small codex, 5 scenes, known references
+* **Style test pack:** sentences crafted to break ED bounds
+* **Contradiction kit:** renamed items, timeline shifts, banned words
+
+---
+
+# 12) Security & Privacy
+
+* Local-first file storage (no cloud by default)
+* API key required for all operations
+* Optional redaction of personally identifying details in logs
+* Configurable OpenRouter anonymization
+
+---
+
+# 13) Deployment
+
+## 13.1 Dev (docker-compose)
+
+* Services: `api`, `ui`, `chroma`, `sqlite` (mounted volume)
+* `.env`:
+
+  * `OPENROUTER_API_KEY=...`
+  * `CHROMA_HOST=chroma`
+  * `DATABASE_URL=sqlite:///data/app.db`
+  * `GIT_USER_NAME`, `GIT_USER_EMAIL`
+
+## 13.2 Prod
+
+* Postgres instead of SQLite
+* HTTPS via reverse proxy (Caddy/Traefik)
+* Background workers (RQ/Celery) for job queue
+* Object storage for artifacts (MinIO/S3)
+
+---
+
+# 14) CLI (Developer Utility)
+
+```
+wrx index codex/ manuscript/ --reindex
+wrx pass --scene ch02_s03 --agents lore,grim,tone --edge 1
+wrx apply --scene ch02_s03 --variant safe --msg "Apply safe patch"
+wrx report --chapter 2 --format html
+```
+
+---
+
+# 15) Roadmap (Post-MVP)
+
+* Add Dialogue Demon, Pacing Surgeon, Plot Twister
+* Beat Map heat-view: reversal enforcement at 8–11% and 50%
+* Reviewer Persona Pack (hostile reviewer, genre purist, producer)
+* User accounts, projects, and cloud sync
+* Fine-grained red-team dial per character/scene
+
+---
+
+# 16) Work Breakdown Structure (WBS)
+
+**Week 1–2**
+
+* Repo scaffolding, Docker, .env
+* DB schema + migration
+* Ingest/indexer + embeddings
+* Minimal RAG retrieval
+
+**Week 3–4**
+
+* Supervisor + Lore Archivist agent
+* Grim Editor agent + diff composer
+* Metrics module (subset)
+
+**Week 5**
+
+* API endpoints + job runner
+* Basic UI: scenes list, run pass, diff viewer
+
+**Week 6**
+
+* Canon receipts linking
+* Apply patch + Git integration
+* Reports + packaging
+
+**Stretch**
+
+* Red-Team variant + edge dial
+* Chapter report export
+
+---
+
+# 17) Deliverables
+
+1. **Source code** (API, orchestrator, UI, CLI)
+2. **Docker setup** + makefile
+3. **Configs** (`agents.yaml`, `metrics.yaml`, `project.yaml`)
+4. **Seed data** (mini codex/manuscript for tests)
+5. **Test suite** (unit + integration)
+6. **Docs**: README, API docs (OpenAPI), contributor guide
+
+---
+
+# 18) Example Inputs/Outputs
+
+**Run Pass (request)**
+
+```json
+{
+  "scene_id": "ch01_s01",
+  "agents": ["lore_archivist","grim_editor","tone_metrics"],
+  "edge_intensity": 1
+}
+```
+
+**Run Pass (result excerpt)**
+
+```json
+{
+  "variants": {
+    "safe": {
+      "diff": "@@ ...",
+      "canon_receipts": [{"source":"codex/systems/energy_core.md","lines":"L12-L24"}],
+      "metrics_before": {"flesch": 72.1, "avg_sentence_len": 16.2, "active_verbs_pct": 92},
+      "metrics_after": {"flesch": 79.3, "avg_sentence_len": 13.1, "active_verbs_pct": 96}
+    },
+    "bold": { "diff": "@@ ...", "canon_receipts": [], "metrics_before": {...}, "metrics_after": {...} }
+  }
+}
+```
+
+---
+
+# 19) Implementation Notes (Gotchas)
+
+* **Chunking:** Use overlapping windows (e.g., 800–1200 tokens, stride 200) to preserve context for lore lookups.
+* **Receipts:** Store `source_path` + `line_start/line_end` when embedding; enable snippet recall for UI.
+* **Diff safety:** Before apply, run a dry-run parse to ensure anchors exist; if drifted, rebase by fuzzy match (rapidfuzz) or fail gracefully.
+* **Metrics:** Don’t over-optimize per pass. “Safe” should make minimal edits to hit bands; “Bold” may skew slightly if gains are clear.
+* **Red-Team:** Never auto-apply; label clearly. Respect global banned terms list.
+* **Costs:** Cache retrieval and agent results by (scene\_id, file hash, config hash).
+
+---
+
+# 20) Definition of Done (MVP)
+
+* Author can:
+
+  * Index a project
+  * Run a pass on any scene
+  * View diffs, receipts, and metrics
+  * Apply a chosen patch and commit
+* Test corpus confirms <2% canon violations and metrics bands achieved on “safe” variants ≥80% of the time.
+
+---
+
+If you want, I can generate a starter repo skeleton (folders, baseline code files, and stub prompts) so your developer can `git clone`, `docker compose up`, and start wiring immediately.
