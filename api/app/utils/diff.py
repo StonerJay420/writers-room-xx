@@ -1,52 +1,59 @@
-"""Diff utility functions as specified in Prompt 10."""
+"""Diff utilities for patch creation and application."""
 import difflib
-from typing import List, Optional
 from pathlib import Path
-from rapidfuzz import fuzz
+from typing import List
+import re
 import logging
+
+try:
+    from rapidfuzz import fuzz
+    RAPIDFUZZ_AVAILABLE = True
+except ImportError:
+    RAPIDFUZZ_AVAILABLE = False
+    fuzz = None
 
 logger = logging.getLogger(__name__)
 
 
-def make_unified_diff(
-    original: str, 
-    revised: str, 
-    filename: str = "file.txt",
-    n: int = 3
-) -> str:
+def make_unified_diff(original: str, revised: str, filename: str) -> str:
     """
-    Create unified diff between original and revised text.
+    Create a unified diff between two text strings.
     
     Args:
-        original: Original text content
-        revised: Revised text content 
-        filename: Name to use in diff header
-        n: Number of context lines
+        original: Original text
+        revised: Revised text
+        filename: Filename for diff header
         
     Returns:
-        Unified diff as string
+        Unified diff string
     """
     original_lines = original.splitlines(keepends=True)
     revised_lines = revised.splitlines(keepends=True)
     
-    diff = difflib.unified_diff(
+    # Ensure lines end with newlines for proper diff formatting
+    if original_lines and not original_lines[-1].endswith('\n'):
+        original_lines[-1] += '\n'
+    if revised_lines and not revised_lines[-1].endswith('\n'):
+        revised_lines[-1] += '\n'
+    
+    diff_lines = list(difflib.unified_diff(
         original_lines,
         revised_lines,
         fromfile=f"a/{filename}",
         tofile=f"b/{filename}",
-        n=n
-    )
+        lineterm=""
+    ))
     
-    return ''.join(diff)
+    return "\n".join(diff_lines) + ("\n" if diff_lines else "")
 
 
 def apply_patch_to_file(file_path: str, unified_diff: str) -> bool:
     """
-    Apply a unified diff patch to a file with fuzzy matching fallback.
+    Apply a unified diff patch to a file.
     
     Args:
-        file_path: Path to file to patch
-        unified_diff: Unified diff content
+        file_path: Path to the file to patch
+        unified_diff: Unified diff string
         
     Returns:
         True if patch applied successfully, False otherwise
@@ -55,241 +62,178 @@ def apply_patch_to_file(file_path: str, unified_diff: str) -> bool:
         path = Path(file_path)
         
         if not path.exists():
-            logger.error(f"File not found: {file_path}")
+            logger.error(f"File does not exist: {file_path}")
             return False
         
-        original_content = path.read_text(encoding='utf-8')
+        # Read current file content
+        with open(path, 'r', encoding='utf-8') as f:
+            original_lines = f.readlines()
         
-        # Try to apply patch
-        patched_content = apply_patch(original_content, unified_diff)
+        # Parse the diff
+        parsed_hunks = _parse_unified_diff(unified_diff)
+        if not parsed_hunks:
+            logger.warning("No valid hunks found in diff")
+            return False
         
-        if patched_content is None:
-            # Try fuzzy matching as fallback
-            logger.warning(f"Exact patch failed, attempting fuzzy match for {file_path}")
-            patched_content = apply_patch_fuzzy(original_content, unified_diff)
-            
-            if patched_content is None:
-                logger.error(f"Failed to apply patch to {file_path} even with fuzzy matching")
+        # Apply hunks in reverse order to preserve line numbers
+        modified_lines = original_lines[:]
+        
+        for hunk in reversed(parsed_hunks):
+            if not _apply_hunk(modified_lines, hunk):
+                logger.error(f"Failed to apply hunk at line {hunk['start_line']}")
                 return False
         
-        # Write patched content
-        path.write_text(patched_content, encoding='utf-8')
+        # Verify the result makes sense
+        if len(modified_lines) < 0:
+            logger.error("Patch resulted in negative line count")
+            return False
+        
+        # Write the modified content back to file
+        with open(path, 'w', encoding='utf-8') as f:
+            f.writelines(modified_lines)
+        
         logger.info(f"Successfully applied patch to {file_path}")
         return True
         
     except Exception as e:
-        logger.error(f"Error applying patch to {file_path}: {str(e)}")
+        logger.error(f"Error applying patch to {file_path}: {e}")
         return False
 
 
-def apply_patch(original: str, patch: str) -> Optional[str]:
-    """
-    Apply a unified diff patch to text.
-    
-    Args:
-        original: Original text
-        patch: Unified diff patch
-        
-    Returns:
-        Patched text or None if failed
-    """
-    original_lines = original.splitlines(keepends=True)
-    patch_lines = patch.splitlines(keepends=True)
-    
-    # Parse patch
-    hunks = parse_unified_diff(patch_lines)
-    
-    if not hunks:
-        return None
-    
-    # Apply hunks
-    result_lines = original_lines.copy()
-    offset = 0
-    
-    for hunk in hunks:
-        # Adjust line numbers for offset from previous hunks
-        start_line = hunk['start_line'] - 1 + offset
-        
-        # Verify context matches
-        if not verify_context(result_lines, start_line, hunk['context_before']):
-            return None
-        
-        # Apply changes
-        end_line = start_line + len(hunk['removed_lines'])
-        result_lines[start_line:end_line] = hunk['added_lines']
-        
-        # Update offset for next hunk
-        offset += len(hunk['added_lines']) - len(hunk['removed_lines'])
-    
-    return ''.join(result_lines)
-
-
-def apply_patch_fuzzy(original: str, patch: str, threshold: int = 80) -> Optional[str]:
-    """
-    Apply patch with fuzzy matching for slightly drifted content.
-    
-    Args:
-        original: Original text  
-        patch: Unified diff patch
-        threshold: Minimum similarity score (0-100) for fuzzy matching
-        
-    Returns:
-        Patched text or None if failed
-    """
-    original_lines = original.splitlines(keepends=True)
-    patch_lines = patch.splitlines(keepends=True)
-    
-    # Parse patch
-    hunks = parse_unified_diff(patch_lines)
-    
-    if not hunks:
-        return None
-    
-    result_lines = original_lines.copy()
-    offset = 0
-    
-    for hunk in hunks:
-        # Find best matching position using fuzzy search
-        best_pos = find_fuzzy_position(
-            result_lines, 
-            hunk['context_before'] + hunk['removed_lines'],
-            hunk['start_line'] - 1 + offset,
-            threshold
-        )
-        
-        if best_pos is None:
-            logger.warning(f"Could not find fuzzy match for hunk starting at line {hunk['start_line']}")
-            return None
-        
-        # Apply changes at fuzzy matched position
-        end_pos = best_pos + len(hunk['removed_lines'])
-        result_lines[best_pos:end_pos] = hunk['added_lines']
-        
-        # Update offset
-        actual_offset = best_pos - (hunk['start_line'] - 1)
-        offset = actual_offset + len(hunk['added_lines']) - len(hunk['removed_lines'])
-    
-    return ''.join(result_lines)
-
-
-def parse_unified_diff(patch_lines: List[str]) -> List[dict]:
-    """Parse unified diff into hunks."""
+def _parse_unified_diff(unified_diff: str) -> List[dict]:
+    """Parse unified diff into structured hunks."""
+    lines = unified_diff.split('\n')
     hunks = []
     current_hunk = None
     
-    for line in patch_lines:
+    for line in lines:
         if line.startswith('@@'):
-            # Parse hunk header
-            parts = line.split()
-            if len(parts) >= 3:
-                # Extract line numbers
-                old_range = parts[1][1:]  # Remove '-' prefix
-                new_range = parts[2][1:]  # Remove '+' prefix
-                
-                old_start = int(old_range.split(',')[0])
+            # Parse hunk header: @@ -start,count +start,count @@
+            match = re.match(r'@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@', line)
+            if match:
+                old_start = int(match.group(1))
+                old_count = int(match.group(2)) if match.group(2) else 1
+                new_start = int(match.group(3))
+                new_count = int(match.group(4)) if match.group(4) else 1
                 
                 current_hunk = {
                     'start_line': old_start,
-                    'context_before': [],
-                    'removed_lines': [],
-                    'added_lines': [],
-                    'context_after': []
+                    'old_count': old_count,
+                    'new_start': new_start,
+                    'new_count': new_count,
+                    'changes': []
                 }
                 hunks.append(current_hunk)
-                
-        elif current_hunk:
-            if line.startswith('-'):
-                current_hunk['removed_lines'].append(line[1:])
-            elif line.startswith('+'):
-                current_hunk['added_lines'].append(line[1:])
-            elif line.startswith(' '):
-                # Context line
-                if not current_hunk['removed_lines'] and not current_hunk['added_lines']:
-                    current_hunk['context_before'].append(line[1:])
-                else:
-                    current_hunk['context_after'].append(line[1:])
+        elif current_hunk and (line.startswith(' ') or line.startswith('-') or line.startswith('+')):
+            current_hunk['changes'].append(line)
     
     return hunks
 
 
-def verify_context(lines: List[str], start_line: int, context: List[str]) -> bool:
-    """Verify that context lines match at the given position."""
-    for i, context_line in enumerate(context):
-        line_idx = start_line + i
-        if line_idx >= len(lines):
-            return False
-        if lines[line_idx] != context_line:
-            return False
-    return True
+def _apply_hunk(lines: List[str], hunk: dict) -> bool:
+    """Apply a single hunk to the lines."""
+    try:
+        start_idx = hunk['start_line'] - 1  # Convert to 0-indexed
+        
+        # Verify the context matches
+        original_idx = start_idx
+        changes = hunk['changes']
+        
+        # First pass: verify all context and deletion lines match
+        temp_idx = original_idx
+        for change in changes:
+            if change.startswith(' ') or change.startswith('-'):
+                expected_line = change[1:] + '\n'
+                if temp_idx >= len(lines):
+                    logger.error(f"Hunk extends beyond file end: {temp_idx} >= {len(lines)}")
+                    return False
+                
+                actual_line = lines[temp_idx]
+                if change.startswith(' ') and expected_line != actual_line:
+                    # Try fuzzy matching for context lines with rapidfuzz
+                    if not _lines_match_fuzzy(expected_line, actual_line):
+                        logger.error(f"Context mismatch at line {temp_idx + 1}")
+                        return False
+                elif change.startswith('-') and expected_line != actual_line:
+                    # Allow fuzzy matching for deletion lines too
+                    if not _lines_match_fuzzy(expected_line, actual_line):
+                        logger.error(f"Deletion line mismatch at line {temp_idx + 1}")
+                        return False
+                
+                temp_idx += 1
+        
+        # Second pass: apply the changes
+        new_lines = []
+        change_idx = 0
+        original_idx = start_idx
+        
+        for change in changes:
+            if change.startswith(' '):
+                # Context line - keep as is
+                new_lines.append(lines[original_idx])
+                original_idx += 1
+            elif change.startswith('-'):
+                # Deletion - skip the original line
+                original_idx += 1
+            elif change.startswith('+'):
+                # Addition - add the new line
+                new_lines.append(change[1:] + '\n')
+        
+        # Replace the section in the original lines
+        end_idx = original_idx
+        lines[start_idx:end_idx] = new_lines
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error applying hunk: {e}")
+        return False
 
 
-def find_fuzzy_position(
-    lines: List[str], 
-    search_lines: List[str], 
-    hint_pos: int,
-    threshold: int = 80
-) -> Optional[int]:
+def _lines_match_fuzzy(expected: str, actual: str, threshold: float = 0.85) -> bool:
     """
-    Find position in lines that fuzzy matches search_lines.
+    Check if two lines match using fuzzy string matching.
     
     Args:
-        lines: Haystack lines to search in
-        search_lines: Needle lines to find
-        hint_pos: Suggested starting position
-        threshold: Minimum similarity score
+        expected: Expected line content
+        actual: Actual line content  
+        threshold: Similarity threshold (0.0 to 1.0)
         
     Returns:
-        Best matching position or None
+        True if lines match closely enough
     """
-    if not search_lines:
-        return hint_pos
+    # First try exact match
+    if expected == actual:
+        return True
     
-    search_text = ''.join(search_lines)
-    search_len = len(search_lines)
+    # Try stripping whitespace
+    if expected.strip() == actual.strip():
+        return True
     
-    # Search window around hint position
-    search_range = 20
-    start = max(0, hint_pos - search_range)
-    end = min(len(lines), hint_pos + search_range + search_len)
+    # Use rapidfuzz if available for fuzzy matching
+    if RAPIDFUZZ_AVAILABLE and fuzz:
+        similarity = fuzz.ratio(expected.strip(), actual.strip()) / 100.0
+        return similarity >= threshold
     
-    best_score = 0
-    best_pos = None
+    # Fallback: simple character-based similarity
+    expected_clean = expected.strip()
+    actual_clean = actual.strip()
     
-    for pos in range(start, end - search_len + 1):
-        candidate_text = ''.join(lines[pos:pos + search_len])
-        score = fuzz.ratio(search_text, candidate_text)
-        
-        if score > best_score:
-            best_score = score
-            best_pos = pos
+    if not expected_clean and not actual_clean:
+        return True
+    if not expected_clean or not actual_clean:
+        return False
     
-    if best_score >= threshold:
-        return best_pos
+    # Simple Levenshtein-like comparison
+    max_len = max(len(expected_clean), len(actual_clean))
+    min_len = min(len(expected_clean), len(actual_clean))
     
-    return None
-
-
-def create_line_mapping(original: str, revised: str) -> dict:
-    """
-    Create mapping between line numbers in original and revised text.
+    # If length difference is too large, not a match
+    if max_len > min_len * 1.5:
+        return False
     
-    Returns:
-        Dict mapping original line numbers to revised line numbers
-    """
-    original_lines = original.splitlines()
-    revised_lines = revised.splitlines()
+    # Count matching characters in similar positions
+    matches = sum(1 for i in range(min_len) if expected_clean[i] == actual_clean[i])
+    similarity = matches / max_len
     
-    matcher = difflib.SequenceMatcher(None, original_lines, revised_lines)
-    mapping = {}
-    
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        if tag == 'equal':
-            for i in range(i2 - i1):
-                mapping[i1 + i] = j1 + i
-        elif tag == 'replace':
-            # Map to closest revised line
-            for i in range(i2 - i1):
-                if j2 > j1:
-                    mapping[i1 + i] = j1 + min(i, j2 - j1 - 1)
-    
-    return mapping
+    return similarity >= threshold

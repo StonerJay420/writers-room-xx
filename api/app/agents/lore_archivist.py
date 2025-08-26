@@ -48,7 +48,7 @@ async def run_lore_archivist(
         canon_chunks = []
         
         for query in search_queries:
-            chunks = retrieve_fn(query, k=5, filters={"type": "codex"})
+            chunks = retrieve_fn(query, 5, {"type": "codex"})
             canon_chunks.extend(chunks)
         
         # Remove duplicates based on source_path
