@@ -128,6 +128,7 @@ from .routers.diff import router as diff_router
 from .routers.reports import router as reports_router
 from .routers.search import router as search_router
 from .routers.passes import router as passes_router
+from .routers.ai import router as ai_router
 
 # Include routers
 app.include_router(auth_router, prefix="/api")  # Auth first (no auth required)
@@ -146,3 +147,4 @@ app.include_router(diff_router, prefix="/api")
 app.include_router(reports_router, prefix="/api")
 app.include_router(search_router, prefix="/api")
 app.include_router(passes_router, prefix="/api")
+app.include_router(ai_router, prefix="/api")

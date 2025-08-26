@@ -24,11 +24,15 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
     const results = []
 
     for (const file of Array.from(files)) {
-      if (!file.name.endsWith('.md')) {
+      // Check supported file formats
+      const supportedFormats = ['.md', '.txt', '.docx', '.rtf', '.doc']
+      const isSupported = supportedFormats.some(format => file.name.toLowerCase().endsWith(format))
+      
+      if (!isSupported) {
         results.push({
           filename: file.name,
           status: 'error' as const,
-          message: 'Only .md files are supported'
+          message: 'Supported formats: .md, .txt, .docx, .rtf, .doc'
         })
         continue
       }
@@ -109,7 +113,7 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
       >
         <Upload size={48} className={`mx-auto mb-4 ${dragActive ? 'text-primary-500' : 'text-gray-400'}`} />
         <p className="text-lg font-medium text-gray-700 mb-2">
-          Drop markdown files here
+          Drop manuscript files here
         </p>
         <p className="text-gray-500 mb-4">
           or click to browse
@@ -117,7 +121,7 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
         <input
           type="file"
           multiple
-          accept=".md"
+          accept=".md,.txt,.docx,.rtf,.doc"
           onChange={handleFileInput}
           className="hidden"
           id="file-upload"

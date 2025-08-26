@@ -28,6 +28,9 @@ export default function RootLayout({
                   <a href="/upload" className="text-gray-600 hover:text-gray-900">
                     Upload
                   </a>
+                  <a href="/editor" className="text-gray-600 hover:text-gray-900">
+                    Editor
+                  </a>
                 </nav>
               </div>
             </div>

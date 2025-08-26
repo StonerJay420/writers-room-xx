@@ -34,9 +34,16 @@ async def upload_file(
     file: UploadFile = File(...),
     file_type: str = Form(..., description="Either 'manuscript' or 'codex'")
 ):
-    """Upload a markdown file."""
-    if not file.filename or not file.filename.endswith('.md'):
-        raise HTTPException(status_code=400, detail="Only .md files are allowed")
+    """Upload a manuscript file in various formats."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided")
+    
+    # Check supported file formats
+    supported_formats = ['.md', '.txt', '.docx', '.rtf', '.doc']
+    is_supported = any(file.filename.lower().endswith(fmt) for fmt in supported_formats)
+    
+    if not is_supported:
+        raise HTTPException(status_code=400, detail="Supported formats: .md, .txt, .docx, .rtf, .doc")
 
     if file_type not in ['manuscript', 'codex']:
         raise HTTPException(status_code=400, detail="file_type must be 'manuscript' or 'codex'")
@@ -45,10 +52,16 @@ async def upload_file(
     target_dir = Path(f"data/{file_type}")
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    # Save file
+    # Save file with content processing
     file_path = target_dir / file.filename
+    
+    # Read and process file content based on format
+    content = await file.read()
+    
+    # For non-markdown files, we might need conversion
+    # For now, save the file as-is and let the indexing process handle conversion
     with open(file_path, 'wb') as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        buffer.write(content)
 
     return {
         "filename": file.filename,
