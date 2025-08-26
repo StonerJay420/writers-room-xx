@@ -72,8 +72,11 @@ async def health() -> Dict[str, Any]:
         from .db import get_read_session
         from sqlalchemy import text
         
-        with get_read_session() as db:
-            db.execute(text("SELECT 1"))
+        db_session = next(get_read_session())
+        try:
+            db_session.execute(text("SELECT 1"))
+        finally:
+            db_session.close()
         
         db_status = "ok"
     except Exception as e:

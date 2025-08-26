@@ -45,9 +45,10 @@ async def get_text_recommendations(
     if not request.text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty")
     
+    import time
+    start_time = time.time()
+    
     try:
-        import time
-        start_time = time.time()
         
         # Check if OpenAI API key is available
         openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -103,7 +104,10 @@ async def get_text_recommendations(
         )
         
         import json
-        recommendations_data = json.loads(response.choices[0].message.content)
+        content = response.choices[0].message.content
+        if content is None:
+            raise ValueError("OpenAI response content is None")
+        recommendations_data = json.loads(content)
         
         # Parse recommendations
         recommendations = []
@@ -133,7 +137,7 @@ async def get_text_recommendations(
     except Exception as e:
         # Fall back to mock recommendations if OpenAI fails
         mock_recommendations = generate_mock_recommendations(request.text)
-        processing_time = time.time() - start_time if 'start_time' in locals() else 0.0
+        processing_time = time.time() - start_time
         
         return RecommendationsResponse(
             recommendations=mock_recommendations,

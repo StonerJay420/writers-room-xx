@@ -36,11 +36,10 @@ export function TextEditor({ initialText = '', onSave, fileName }: TextEditorPro
 
     setIsLoadingRecommendations(true)
     try {
-      const response = await api.post('/ai/recommendations', {
+      const data = await api.post<{ recommendations?: AIRecommendation[] }>('/ai/recommendations', {
         text: currentText,
         context: 'manuscript_editing'
       })
-      const data = response.data as { recommendations?: AIRecommendation[] }
       setRecommendations(data.recommendations || [])
     } catch (error) {
       console.error('Failed to get AI recommendations:', error)
