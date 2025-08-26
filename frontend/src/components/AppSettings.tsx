@@ -24,6 +24,7 @@ import {
 import { useTheme } from '@/contexts/ThemeContext'
 import { AuthManager } from '@/lib/auth'
 import { ModelSelector } from './ModelSelector'
+import { api } from '@/lib/api'
 
 interface ModelPreferences {
   lore_archivist: string
@@ -55,6 +56,8 @@ export function AppSettings({ modelPreferences, onModelChange }: AppSettingsProp
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [testingAI, setTestingAI] = useState(false)
+  const [aiTestResult, setAiTestResult] = useState<string | null>(null)
   const [appSettings, setAppSettings] = useState<AppSettings>({
     autoSave: true,
     processingMode: 'adaptive',
@@ -258,6 +261,44 @@ export function AppSettings({ modelPreferences, onModelChange }: AppSettingsProp
     setTimeout(() => setSuccess(null), 3000)
   }
 
+  const testAIConnection = async () => {
+    setTestingAI(true)
+    setAiTestResult(null)
+    setError(null)
+
+    try {
+      const testText = "This is a test sentence to verify AI connectivity."
+      const response = await api.post<{recommendations: any[], total: number, processing_time: number}>('/ai/recommendations', {
+        text: testText,
+        context: 'test_connection',
+        max_recommendations: 1
+      })
+
+      if (response.recommendations && response.recommendations.length > 0) {
+        setAiTestResult('✅ AI connection successful! Received recommendation response.')
+      } else {
+        setAiTestResult('⚠️ AI connected but no recommendations returned (this is normal for short test text).')
+      }
+
+      // Also test AI status endpoint
+      const statusResponse = await api.get('/ai/status')
+      console.log('AI Status:', statusResponse)
+
+    } catch (error: any) {
+      console.error('AI test failed:', error)
+      if (error.message.includes('401')) {
+        setAiTestResult('❌ Authentication failed. Please check your API key configuration.')
+      } else if (error.message.includes('403')) {
+        setAiTestResult('❌ API key invalid or insufficient permissions.')
+      } else {
+        setAiTestResult('❌ AI connection failed: ' + (error.message || 'Unknown error'))
+      }
+    } finally {
+      setTestingAI(false)
+      setTimeout(() => setAiTestResult(null), 10000)
+    }
+  }
+
   const renderApiSection = () => (
     <div className="space-y-6">
       <div>
@@ -280,13 +321,32 @@ export function AppSettings({ modelPreferences, onModelChange }: AppSettingsProp
                 <p className="text-gray-400 text-sm">Your OpenRouter API key is active</p>
               </div>
             </div>
-            <button
-              onClick={handleRemoveOpenRouterKey}
-              disabled={loading}
-              className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded disabled:opacity-50"
-            >
-              {loading ? 'Removing...' : 'Remove Key'}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={testAIConnection}
+                disabled={testingAI}
+                className="px-4 py-2 text-sm neon-button rounded disabled:opacity-50"
+              >
+                {testingAI ? (
+                  <>
+                    <RefreshCw size={14} className="inline mr-1 animate-spin" />
+                    Testing...
+                  </>
+                ) : (
+                  <>
+                    <Zap size={14} className="inline mr-1" />
+                    Test AI
+                  </>
+                )}
+              </button>
+              <button
+                onClick={handleRemoveOpenRouterKey}
+                disabled={loading}
+                className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded disabled:opacity-50"
+              >
+                {loading ? 'Removing...' : 'Remove Key'}
+              </button>
+            </div>
           </div>
         </div>
       ) : (
@@ -331,6 +391,19 @@ export function AppSettings({ modelPreferences, onModelChange }: AppSettingsProp
               >
                 {loading ? 'Saving...' : 'Save API Key'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Test Result Display */}
+      {aiTestResult && (
+        <div className="neon-card rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <Zap className="text-neon-cyan mt-0.5" size={16} />
+            <div className="text-sm">
+              <p className="font-medium text-gray-300 mb-1">AI Connection Test</p>
+              <p className="text-gray-400">{aiTestResult}</p>
             </div>
           </div>
         </div>

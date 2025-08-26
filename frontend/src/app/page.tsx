@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { BarChart3, FileText, Settings, Upload, Home as HomeIcon, Library, BookOpen, Package } from 'lucide-react'
+import { BarChart3, FileText, Settings, Upload, Home as HomeIcon, Library, BookOpen, Package, Edit } from 'lucide-react'
 import { Tabs } from '@/components/Tabs'
 import { Dashboard } from '@/components/Dashboard'
 import { SceneLibrary } from '@/components/SceneLibrary'
@@ -10,6 +10,7 @@ import { FileManager } from '@/components/FileManager'
 import { ManuscriptNavigator } from '@/components/ManuscriptNavigator'
 import { CodexManager } from '@/components/CodexManager'
 import { SceneCreateForm } from '@/components/SceneCreateForm'
+import { TextEditor } from '@/components/TextEditor'
 import { Scene, ModelPreferences, CreateSceneResponse } from '@/types'
 
 export default function Home() {
@@ -146,12 +147,22 @@ export default function Home() {
     console.log('Selected scene:', scene)
   }
 
+  const openSceneInEditor = (scene: Scene) => {
+    setSelectedScene(scene)
+    setActiveTab('editor')
+  }
+
   const tabs = [
     {
       id: 'navigator',
       label: 'Navigator',
       icon: <BookOpen size={16} />,
       badge: scenes.length
+    },
+    {
+      id: 'editor',
+      label: 'AI Editor',
+      icon: <Edit size={16} />,
     },
     {
       id: 'dashboard',
@@ -227,13 +238,22 @@ export default function Home() {
                       </div>
                     )}
                   </div>
-                  <button
-                    onClick={() => processScene(selectedScene.id)}
-                    disabled={processingScene === selectedScene.id}
-                    className="bg-neon-purple hover:bg-neon-purple/80 text-white px-4 py-2 rounded-lg disabled:opacity-50"
-                  >
-                    {processingScene === selectedScene.id ? 'Processing...' : 'Process Scene'}
-                  </button>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => processScene(selectedScene.id)}
+                      disabled={processingScene === selectedScene.id}
+                      className="bg-neon-purple hover:bg-neon-purple/80 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+                    >
+                      {processingScene === selectedScene.id ? 'Processing...' : 'Process Scene'}
+                    </button>
+                    <button
+                      onClick={() => openSceneInEditor(selectedScene)}
+                      className="bg-neon-cyan hover:bg-neon-cyan/80 text-white px-4 py-2 rounded-lg"
+                    >
+                      <Edit size={16} className="inline mr-2" />
+                      Edit with AI
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-20 text-gray-400">
@@ -243,6 +263,29 @@ export default function Home() {
                 </div>
               )}
             </div>
+          </div>
+        )
+      case 'editor':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-display font-bold gradient-text mb-2">
+                AI-Powered Text Editor
+              </h2>
+              <p className="text-gray-400">
+                Write and improve your manuscript with AI assistance
+              </p>
+            </div>
+            <TextEditor
+              initialText={selectedScene ? `# Scene ${selectedScene.id}\n\nChapter ${selectedScene.chapter}, Scene ${selectedScene.order_in_chapter}\n\n[Scene content goes here...]` : ''}
+              onSave={async (text) => {
+                if (selectedScene) {
+                  console.log('Saving scene content for:', selectedScene.id, text)
+                  // You could implement a scene content update endpoint here
+                }
+              }}
+              fileName={selectedScene ? `${selectedScene.id}.md` : undefined}
+            />
           </div>
         )
       case 'dashboard':

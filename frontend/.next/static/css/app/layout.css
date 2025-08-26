@@ -629,6 +629,9 @@ body{
 .ml-auto{
   margin-left: auto;
 }
+.mr-1{
+  margin-right: 0.25rem;
+}
 .mr-2{
   margin-right: 0.5rem;
 }
@@ -664,6 +667,9 @@ body{
 }
 .inline-block{
   display: inline-block;
+}
+.inline{
+  display: inline;
 }
 .flex{
   display: flex;
@@ -1131,6 +1137,10 @@ body{
 }
 .bg-green-900\/20{
   background-color: rgb(20 83 45 / 0.2);
+}
+.bg-neon-cyan{
+  --tw-bg-opacity: 1;
+  background-color: rgb(0 255 255 / var(--tw-bg-opacity));
 }
 .bg-neon-cyan\/10{
   background-color: rgb(0 255 255 / 0.1);
@@ -1733,6 +1743,10 @@ body {
 
 .hover\:bg-green-600\/20:hover{
   background-color: rgb(22 163 74 / 0.2);
+}
+
+.hover\:bg-neon-cyan\/80:hover{
+  background-color: rgb(0 255 255 / 0.8);
 }
 
 .hover\:bg-neon-purple\/10:hover{
