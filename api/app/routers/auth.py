@@ -51,7 +51,7 @@ async def create_session(request: CreateSessionRequest):
     The API key should be used in subsequent requests for authentication.
     """
     try:
-        api_key = AuthManager.create_user_session(request.name)
+        api_key = AuthManager.create_user_session(request.name or "default")
         
         return SessionResponse(
             api_key=api_key,

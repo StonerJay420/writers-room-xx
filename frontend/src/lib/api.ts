@@ -1,3 +1,5 @@
+import { AuthManager } from './auth'
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 class ApiClient {
@@ -13,11 +15,29 @@ class ApiClient {
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`
 
+    // Get API key for authentication
+    let apiKey: string | null = null
+    try {
+      // Only get API key for endpoints that require auth
+      if (endpoint.startsWith('/ai/') || endpoint.startsWith('/protected/')) {
+        apiKey = await AuthManager.getOrCreateSession()
+      }
+    } catch (error) {
+      console.warn('Could not get API key:', error)
+    }
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...options.headers as Record<string, string>,
+    }
+
+    // Add authorization header if we have an API key
+    if (apiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`
+    }
+
     const config: RequestInit = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
+      headers,
       ...options,
     }
 

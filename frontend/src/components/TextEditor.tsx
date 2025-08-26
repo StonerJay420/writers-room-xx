@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
+import { AuthManager } from '@/lib/auth'
 import { Wand2, Check, X, Copy, Save, RefreshCw } from 'lucide-react'
+import { OpenRouterKeySetup } from './OpenRouterKeySetup'
 
 interface AIRecommendation {
   id: string
@@ -26,13 +28,36 @@ export function TextEditor({ initialText = '', onSave, fileName }: TextEditorPro
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false)
   const [selectedRecommendation, setSelectedRecommendation] = useState<string | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [hasOpenRouterKey, setHasOpenRouterKey] = useState(false)
+  const [checkingKey, setCheckingKey] = useState(true)
 
   useEffect(() => {
     setHasUnsavedChanges(currentText !== originalText)
   }, [currentText, originalText])
 
+  useEffect(() => {
+    checkOpenRouterKey()
+  }, [])
+
+  const checkOpenRouterKey = async () => {
+    try {
+      setCheckingKey(true)
+      const hasKey = await AuthManager.hasOpenRouterKey()
+      setHasOpenRouterKey(hasKey)
+    } catch (error) {
+      console.error('Failed to check OpenRouter key:', error)
+    } finally {
+      setCheckingKey(false)
+    }
+  }
+
   const getAIRecommendations = async () => {
     if (!currentText.trim()) return
+
+    if (!hasOpenRouterKey) {
+      alert('Please configure your OpenRouter API key first to use AI recommendations.')
+      return
+    }
 
     setIsLoadingRecommendations(true)
     try {
@@ -41,19 +66,24 @@ export function TextEditor({ initialText = '', onSave, fileName }: TextEditorPro
         context: 'manuscript_editing'
       })
       setRecommendations(data.recommendations || [])
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get AI recommendations:', error)
-      // Mock recommendations for demo purposes
-      setRecommendations([
-        {
-          id: '1',
-          originalText: currentText.split('.')[0] + '.',
-          suggestedText: currentText.split('.')[0] + ', creating a vivid scene.',
-          reason: 'Enhanced descriptiveness and flow',
-          confidence: 0.85,
-          type: 'style'
-        }
-      ])
+      
+      if (error.message.includes('401')) {
+        alert('Authentication failed. Please check your OpenRouter API key configuration.')
+      } else {
+        // Mock recommendations for demo purposes when API fails
+        setRecommendations([
+          {
+            id: '1',
+            originalText: currentText.split('.')[0] + '.',
+            suggestedText: currentText.split('.')[0] + ', creating a vivid scene.',
+            reason: 'Enhanced descriptiveness and flow (mock - API failed)',
+            confidence: 0.85,
+            type: 'style'
+          }
+        ])
+      }
     } finally {
       setIsLoadingRecommendations(false)
     }
@@ -101,6 +131,35 @@ export function TextEditor({ initialText = '', onSave, fileName }: TextEditorPro
       default:
         return 'border-gray-400 bg-gray-50'
     }
+  }
+
+  if (checkingKey) {
+    return (
+      <div className="neon-card rounded-lg p-6">
+        <div className="text-center">
+          <RefreshCw className="animate-spin mx-auto mb-3 text-neon-cyan" size={32} />
+          <p className="text-gray-400">Setting up AI recommendations...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!hasOpenRouterKey) {
+    return (
+      <div className="space-y-6">
+        <OpenRouterKeySetup onKeyConfigured={() => {
+          setHasOpenRouterKey(true)
+          checkOpenRouterKey()
+        }} />
+        
+        <div className="neon-card rounded-lg p-6">
+          <div className="text-center text-gray-500">
+            <Wand2 size={32} className="mx-auto mb-2 opacity-50" />
+            <p>Configure your OpenRouter API key above to enable AI-powered text recommendations</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

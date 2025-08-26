@@ -2,11 +2,13 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
-import openai
-import os
+import json
+import time
 from sqlalchemy.orm import Session
 
 from ..db import get_read_session
+from ..auth import get_current_user, get_user_llm_client
+from ..services.llm_client import LLMClient
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -38,22 +40,21 @@ class RecommendationsResponse(BaseModel):
 @router.post("/recommendations", response_model=RecommendationsResponse)
 async def get_text_recommendations(
     request: RecommendationRequest,
+    user: dict = Depends(get_current_user),
+    llm_client: LLMClient = Depends(get_user_llm_client),
     db: Session = Depends(get_read_session)
 ):
-    """Get AI recommendations for text improvement."""
+    """Get AI recommendations for text improvement using OpenRouter BYOK."""
     
     if not request.text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty")
     
-    import time
     start_time = time.time()
     
     try:
-        
-        # Check if OpenAI API key is available
-        openai_api_key = os.getenv("OPENAI_API_KEY")
-        if not openai_api_key:
-            # Return mock recommendations for demo
+        # Check if user has configured their OpenRouter API key
+        if not llm_client.api_key:
+            # Return mock recommendations if no API key
             mock_recommendations = generate_mock_recommendations(request.text)
             processing_time = time.time() - start_time
             
@@ -63,10 +64,10 @@ async def get_text_recommendations(
                 processing_time=processing_time
             )
         
-        # Use OpenAI to generate recommendations
-        client = openai.OpenAI(api_key=openai_api_key)
+        # Use OpenRouter with user's API key for recommendations
+        system_prompt = "You are an expert writing assistant that provides specific, actionable recommendations for improving manuscript text."
         
-        prompt = f"""
+        user_prompt = f"""
         Analyze the following text for writing improvements and provide specific recommendations.
         Focus on {request.context}.
         
@@ -92,22 +93,21 @@ async def get_text_recommendations(
         - Tone and voice consistency
         """
         
-        response = client.chat.completions.create(
-            model="gpt-5",  # the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-            messages=[
-                {"role": "system", "content": "You are an expert writing assistant that provides specific, actionable recommendations for improving manuscript text."},
-                {"role": "user", "content": prompt}
-            ],
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+        
+        # Use Claude Sonnet for writing recommendations
+        llm_response = await llm_client.complete(
+            messages=messages,
+            model="anthropic/claude-3-sonnet",
             temperature=0.3,
             max_tokens=1500,
-            response_format={"type": "json_object"}
+            json_mode=True
         )
         
-        import json
-        content = response.choices[0].message.content
-        if content is None:
-            raise ValueError("OpenAI response content is None")
-        recommendations_data = json.loads(content)
+        recommendations_data = json.loads(llm_response.content)
         
         # Parse recommendations
         recommendations = []
@@ -166,12 +166,24 @@ def generate_mock_recommendations(text: str) -> List[AIRecommendation]:
 
 
 @router.get("/status")
-async def ai_status():
-    """Get AI service status."""
-    openai_available = bool(os.getenv("OPENAI_API_KEY"))
+async def ai_status(
+    user: dict = Depends(get_current_user),
+    llm_client: LLMClient = Depends(get_user_llm_client)
+):
+    """Get AI service status for the authenticated user."""
+    has_api_key = bool(llm_client.api_key)
     
     return {
         "status": "ai service ready",
-        "openai_available": openai_available,
-        "models_available": ["gpt-5"] if openai_available else ["mock"]
+        "openrouter_configured": has_api_key,
+        "byok_enabled": True,
+        "user": user["name"],
+        "models_available": [
+            "anthropic/claude-3-opus",
+            "anthropic/claude-3-sonnet", 
+            "anthropic/claude-3-haiku",
+            "openai/gpt-4-turbo-preview",
+            "openai/gpt-3.5-turbo"
+        ] if has_api_key else ["mock"],
+        "recommended_model": "anthropic/claude-3-sonnet"
     }
