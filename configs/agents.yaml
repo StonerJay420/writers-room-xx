@@ -1,69 +1,48 @@
-# Agent configuration for Writers Room X
+# Agent configuration for Writers Room X as specified in Prompt 26
 
-agents:
-  lore_archivist:
-    name: "Lore Archivist"
-    model: "anthropic/claude-3-sonnet"
-    temperature: 0.3
-    max_tokens: 2000
-    role: "Canon consistency checker and lore expert"
-    tools:
-      - retrieve_canon
-      - validate_consistency
-    focus: "character consistency, world-building, canon adherence"
+supervisor: 
+  model: "reasoner-1"
+  max_tokens: 4000
+  temperature: 0.2
 
-  grim_editor:
-    name: "Grim Editor"
-    model: "anthropic/claude-3-haiku"
-    temperature: 0.7
-    max_tokens: 2500
-    role: "Line editor focused on prose improvement"
-    tools:
-      - analyze_prose
-      - suggest_edits
-    focus: "grammar, style, flow, clarity, word choice"
+lore_archivist: 
+  model: "reasoner-1"
+  temperature: 0.3
+  tools: ["rag", "citations"]
 
-  tone_metrics:
-    name: "Tone & Metrics Analyst"
-    model: "openai/gpt-4-turbo-preview"
-    temperature: 0.5
-    max_tokens: 1500
-    role: "Writing quality and tone analyzer"
-    tools:
-      - compute_metrics
-      - analyze_tone
-    focus: "readability, tone consistency, pacing, voice"
+grim_editor: 
+  model: "stylist-1"
+  temperature: 0.7
+  tools: ["diff", "metrics"]
 
-  supervisor:
-    name: "Supervisor"
-    model: "anthropic/claude-3-opus"
-    temperature: 0.4
-    max_tokens: 3000
-    role: "Senior editor providing strategic guidance"
-    tools:
-      - plan_edits
-      - coordinate_agents
-      - compose_variants
-    focus: "story structure, character development, thematic coherence"
+dialogue_demon: 
+  model: "stylist-1"
+  temperature: 0.8
+  tools: ["diff"]
 
-variants:
-  safe:
-    name: "Safe Edits"
-    description: "Conservative improvements focusing on clarity and readability"
-    agents: ["grim_editor", "tone_metrics"]
-    risk_level: "low"
-    expected_improvements: ["Grammar", "Clarity", "Flow"]
+pacing_surgeon: 
+  model: "reasoner-1"
+  temperature: 0.5
+  tools: ["metrics", "diff"]
 
-  bold:
-    name: "Bold Revisions"
-    description: "Significant structural and stylistic improvements"
-    agents: ["lore_archivist", "grim_editor", "tone_metrics"]
-    risk_level: "medium"
-    expected_improvements: ["Structure", "Voice", "Impact", "Canon consistency"]
+plot_twister: 
+  model: "reasoner-1"
+  temperature: 0.6
 
-  experimental:
-    name: "Experimental"
-    description: "Radical reimagining with creative risks"
-    agents: ["supervisor", "lore_archivist", "grim_editor", "tone_metrics"]
-    risk_level: "high"
-    expected_improvements: ["Creativity", "Dramatic impact", "Unique voice"]
+tone_metrics: 
+  model: "critic-1"
+  temperature: 0.2
+  tools: ["metrics"]
+
+red_team: 
+  model: "stylist-1"
+  temperature: 0.9
+  tools: ["diff"]
+
+reviewer_pack: 
+  model: "reasoner-1"
+  temperature: 0.5
+
+voice_simulator: 
+  model: "stylist-1"
+  temperature: 0.8

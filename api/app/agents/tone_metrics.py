@@ -30,10 +30,10 @@ class ToneMetricsResult(BaseModel):
     tone_analysis: Dict[str, Any]
 
 
-async def run_tone_metrics(
+def run_tone_metrics(
     scene_text: str,
     edited_text: Optional[str] = None,
-    targets: Dict[str, Dict[str, float]] = None,
+    targets: Optional[Dict[str, Dict[str, float]]] = None,
     model: str = "anthropic/claude-3-haiku"
 ) -> Dict[str, Any]:
     """
@@ -103,7 +103,10 @@ def _compute_text_metrics(text: str, targets: Dict[str, Dict[str, float]]) -> Di
     metrics = {}
     
     # Flesch Reading Ease
-    flesch_score = textstat.flesch_reading_ease(text)
+    try:
+        flesch_score = float(textstat.flesch_reading_ease(text) or 0)
+    except:
+        flesch_score = 0.0
     flesch_target = targets.get("flesch", {})
     metrics["flesch_reading_ease"] = MetricScore(
         name="Flesch Reading Ease",
@@ -115,7 +118,10 @@ def _compute_text_metrics(text: str, targets: Dict[str, Dict[str, float]]) -> Di
     )
     
     # Flesch-Kincaid Grade Level  
-    fk_grade = textstat.flesch_kincaid_grade(text)
+    try:
+        fk_grade = float(textstat.flesch_kincaid_grade(text) or 0)
+    except:
+        fk_grade = 0.0
     fk_target = targets.get("grade_level", {})
     metrics["flesch_kincaid_grade"] = MetricScore(
         name="Flesch-Kincaid Grade",
@@ -127,8 +133,12 @@ def _compute_text_metrics(text: str, targets: Dict[str, Dict[str, float]]) -> Di
     )
     
     # Average Sentence Length
-    sentences = textstat.sentence_count(text)
-    words = textstat.lexicon_count(text, removepunct=True)
+    try:
+        sentences = int(textstat.sentence_count(text) or 1)
+        words = int(textstat.lexicon_count(text, removepunct=True) or 0)
+    except:
+        sentences = 1
+        words = len(text.split())
     avg_sentence_length = words / sentences if sentences > 0 else 0
     sentence_target = targets.get("sentence_length", {})
     metrics["avg_sentence_length"] = MetricScore(
@@ -141,7 +151,10 @@ def _compute_text_metrics(text: str, targets: Dict[str, Dict[str, float]]) -> Di
     )
     
     # Syllable Count per Word
-    syllables = textstat.syllable_count(text, lang='en_US')
+    try:
+        syllables = int(textstat.syllable_count(text) or 0)
+    except:
+        syllables = words * 1.5  # Estimate
     syllables_per_word = syllables / words if words > 0 else 0
     syllable_target = targets.get("syllable_density", {})
     metrics["syllables_per_word"] = MetricScore(
@@ -314,7 +327,10 @@ def _generate_recommendations(
 
 def _determine_readability_grade(text: str) -> str:
     """Determine human-readable grade level assessment."""
-    grade = textstat.flesch_kincaid_grade(text)
+    try:
+        grade = float(textstat.flesch_kincaid_grade(text) or 0)
+    except:
+        grade = 10.0
     
     if grade < 6:
         return "Elementary (grades 1-5)"
@@ -330,13 +346,22 @@ def _determine_readability_grade(text: str) -> str:
 
 def _analyze_tone(text: str) -> Dict[str, Any]:
     """Analyze tone characteristics of the text."""
+    try:
+        word_count = int(textstat.lexicon_count(text, removepunct=True) or 0)
+        sentence_count = int(textstat.sentence_count(text) or 1)
+        difficult_count = int(textstat.difficult_words(text) or 0)
+    except:
+        word_count = len(text.split())
+        sentence_count = text.count('.') + text.count('!') + text.count('?') or 1
+        difficult_count = 0
+    
     return {
-        "word_count": textstat.lexicon_count(text, removepunct=True),
-        "sentence_count": textstat.sentence_count(text),
+        "word_count": word_count,
+        "sentence_count": sentence_count,
         "paragraph_count": len([p for p in text.split('\n\n') if p.strip()]),
-        "complex_word_ratio": textstat.difficult_words(text) / textstat.lexicon_count(text, removepunct=True) if textstat.lexicon_count(text, removepunct=True) > 0 else 0,
-        "avg_words_per_sentence": textstat.avg_sentence_length(text),
-        "reading_time_minutes": round(textstat.reading_time(text, ms_per_char=14.69) / 60, 1)
+        "complex_word_ratio": difficult_count / word_count if word_count > 0 else 0,
+        "avg_words_per_sentence": word_count / sentence_count if sentence_count > 0 else 0,
+        "reading_time_minutes": round(word_count / 200, 1)  # Estimate 200 words per minute
     }
 
 
@@ -350,7 +375,7 @@ class ToneMetricsAgent(Agent):
             tools=["analyze_metrics", "assess_readability"]
         )
     
-    async def run(self, task: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+    def run(self, task: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """
         Run the tone & metrics agent.
         
@@ -365,7 +390,7 @@ class ToneMetricsAgent(Agent):
         edited_text = task.get("edited_text")
         targets = context.get("targets", {})
         
-        result = await run_tone_metrics(
+        result = run_tone_metrics(
             scene_text=scene_text,
             edited_text=edited_text,
             targets=targets,
