@@ -168,15 +168,6 @@ export function FileManager({ onUploadComplete, onIndexFiles }: FileManagerProps
         </div>
       </div>
 
-      {/* Recent Files */}
-      <div className="neon-card rounded-lg p-6">
-        <h3 className="text-lg font-display font-semibold mb-4">Recent Files</h3>
-        <div className="text-center py-8 text-gray-400">
-          <FileText size={48} className="mx-auto mb-4 opacity-50" />
-          <p>No recent uploads</p>
-          <p className="text-sm">Upload some files to see them here</p>
-        </div>
-      </div>
     </div>
   )
 }

@@ -63,11 +63,15 @@ export function AgentSettings({ modelPreferences, onModelChange }: AgentSettings
 
   const handleSave = async () => {
     setSaveStatus('saving')
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    setSaveStatus('saved')
-    setHasChanges(false)
-    setTimeout(() => setSaveStatus('idle'), 2000)
+    try {
+      // Save model preferences - this will be implemented with actual API
+      setSaveStatus('saved')
+      setHasChanges(false)
+      setTimeout(() => setSaveStatus('idle'), 2000)
+    } catch (error) {
+      setSaveStatus('error')
+      setTimeout(() => setSaveStatus('idle'), 3000)
+    }
   }
 
   const handleReset = () => {
@@ -151,11 +155,11 @@ export function AgentSettings({ modelPreferences, onModelChange }: AgentSettings
         {agents.map((agent) => (
           <div key={agent.id} className="neon-card rounded-lg p-6 space-y-4">
             <div className="flex items-start gap-4">
-              <div className={`text-2xl p-3 rounded-lg bg-${agent.color}/10`}>
+              <div className="text-2xl p-3 rounded-lg bg-neon-purple/10">
                 {agent.icon}
               </div>
               <div className="flex-1">
-                <h3 className={`text-xl font-display font-semibold text-${agent.color} mb-2`}>
+                <h3 className="text-xl font-display font-semibold text-neon-purple mb-2">
                   {agent.name}
                 </h3>
                 <p className="text-gray-400 text-sm mb-3">
@@ -170,7 +174,7 @@ export function AgentSettings({ modelPreferences, onModelChange }: AgentSettings
                     {agent.capabilities.map((capability) => (
                       <span
                         key={capability}
-                        className={`px-2 py-1 text-xs rounded bg-${agent.color}/20 text-${agent.color} border border-${agent.color}/30`}
+                        className="px-2 py-1 text-xs rounded bg-neon-cyan/20 text-neon-cyan border border-neon-cyan/30"
                       >
                         {capability}
                       </span>

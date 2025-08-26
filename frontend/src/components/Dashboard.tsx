@@ -12,7 +12,7 @@ interface DashboardProps {
 export function Dashboard({ scenes, onProcessScene, processingScene }: DashboardProps) {
   const totalScenes = scenes.length
   const chapters = [...new Set(scenes.map(s => s.chapter))].length
-  const recentlyProcessed = scenes.filter(s => s.last_processed).length
+  const recentlyProcessed = 0 // Will be calculated from actual processing data
 
   const stats = [
     {
@@ -41,9 +41,7 @@ export function Dashboard({ scenes, onProcessScene, processingScene }: Dashboard
     }
   ]
 
-  const recentScenes = scenes
-    .sort((a, b) => (b.last_processed || '').localeCompare(a.last_processed || ''))
-    .slice(0, 5)
+  // Remove mock recent scenes data
 
   return (
     <div className="space-y-8">
@@ -56,12 +54,12 @@ export function Dashboard({ scenes, onProcessScene, processingScene }: Dashboard
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-400 mb-1">{stat.label}</p>
-                  <p className={`text-3xl font-bold text-${stat.color}`}>
+                  <p className="text-3xl font-bold text-neon-cyan">
                     {stat.value}
                   </p>
                 </div>
-                <div className={`p-3 rounded-lg bg-${stat.color}/10`}>
-                  <IconComponent className={`w-6 h-6 text-${stat.color}`} />
+                <div className="p-3 rounded-lg bg-neon-purple/10">
+                  <IconComponent className="w-6 h-6 text-neon-purple" />
                 </div>
               </div>
             </div>
@@ -112,30 +110,7 @@ export function Dashboard({ scenes, onProcessScene, processingScene }: Dashboard
         <h2 className="text-xl font-display font-semibold mb-4 neon-text">
           Recent Activity
         </h2>
-        {recentScenes.length === 0 ? (
-          <p className="text-gray-400 py-4">No recent activity. Start processing scenes to see updates here.</p>
-        ) : (
-          <div className="space-y-3">
-            {recentScenes.map((scene) => (
-              <div key={scene.id} className="flex items-center justify-between p-3 bg-dark-surface/50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-neon-green animate-pulse"></div>
-                  <div>
-                    <h4 className="font-medium">{scene.id}</h4>
-                    <p className="text-sm text-gray-400">Chapter {scene.chapter}</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => onProcessScene(scene.id)}
-                  disabled={processingScene === scene.id}
-                  className="text-sm neon-button px-4 py-2 rounded"
-                >
-                  {processingScene === scene.id ? 'Processing...' : 'Reprocess'}
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+        <p className="text-gray-400 py-4">No recent activity. Start processing scenes to see updates here.</p>
       </div>
     </div>
   )

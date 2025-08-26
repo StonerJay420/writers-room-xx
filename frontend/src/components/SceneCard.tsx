@@ -19,7 +19,20 @@ interface SceneCardProps {
 
 export function SceneCard({ scene, onProcess, isProcessing, compact = false }: SceneCardProps) {
   const [expanded, setExpanded] = useState(false)
-  const beats = scene.beats_json ? JSON.parse(scene.beats_json) : []
+  
+  // Safely parse beats_json - handle both string and already-parsed cases
+  const beats = (() => {
+    if (!scene.beats_json) return []
+    if (Array.isArray(scene.beats_json)) return scene.beats_json
+    if (typeof scene.beats_json === 'string') {
+      try {
+        return JSON.parse(scene.beats_json)
+      } catch {
+        return []
+      }
+    }
+    return []
+  })()
 
   return (
     <div className={`neon-card rounded-lg hover:shadow-neon-purple/20 transition-all duration-300 ${
