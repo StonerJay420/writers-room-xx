@@ -623,6 +623,12 @@ body{
 .top-3{
   top: 0.75rem;
 }
+.left-0{
+  left: 0px;
+}
+.right-0{
+  right: 0px;
+}
 .z-50{
   z-index: 50;
 }
@@ -806,6 +812,9 @@ body{
 }
 .min-w-\[16px\]{
   min-width: 16px;
+}
+.min-w-\[300px\]{
+  min-width: 300px;
 }
 .max-w-2xl{
   max-width: 42rem;

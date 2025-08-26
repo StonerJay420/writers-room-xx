@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ChevronDown, Sparkles, Info } from 'lucide-react'
 
 interface Model {
@@ -27,6 +27,7 @@ export function ModelSelector({ agentName, currentModel, onModelChange }: ModelS
   const [selectedModel, setSelectedModel] = useState(currentModel || '')
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     fetchModels()
@@ -95,7 +96,7 @@ export function ModelSelector({ agentName, currentModel, onModelChange }: ModelS
   }, {} as Record<string, Model[]>)
 
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center justify-between w-full px-4 py-2 neon-input rounded-lg transition-colors"
@@ -111,7 +112,12 @@ export function ModelSelector({ agentName, currentModel, onModelChange }: ModelS
       </button>
 
       {isOpen && (
-        <div className="absolute z-[99999] w-full mt-2 neon-card rounded-lg shadow-xl max-h-96 overflow-y-auto">
+        <div className="absolute z-[99999] left-0 right-0 mt-2 neon-card rounded-lg shadow-xl max-h-96 overflow-y-auto" 
+             style={{ 
+               minWidth: '350px',
+               width: 'max-content',
+               maxWidth: '500px'
+             }}>
           {Object.entries(groupedModels).map(([provider, providerModels]) => (
             <div key={provider} className="border-b border-dark-border last:border-b-0">
               <div className={`px-4 py-2 text-xs font-semibold uppercase tracking-wider bg-dark-surface/50 ${getProviderColor(provider)}`}>
