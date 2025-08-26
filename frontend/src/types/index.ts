@@ -2,11 +2,21 @@ export interface Scene {
   id: string
   chapter: number
   order_in_chapter: number
-  pov: string
-  location: string
-  word_count: number
-  created_at: string
-  updated_at: string
+  pov?: string
+  location?: string
+  word_count?: number
+  created_at?: string
+  updated_at?: string
+  last_processed?: string
+  beats_json?: any
+  links_json?: any
+}
+
+export interface ModelPreferences {
+  lore_archivist: string
+  grim_editor: string
+  tone_metrics: string
+  supervisor: string
 }
 
 export interface SceneDetail {

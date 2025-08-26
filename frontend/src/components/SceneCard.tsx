@@ -14,14 +14,17 @@ interface SceneCardProps {
   }
   onProcess: (sceneId: string) => void
   isProcessing: boolean
+  compact?: boolean
 }
 
-export function SceneCard({ scene, onProcess, isProcessing }: SceneCardProps) {
+export function SceneCard({ scene, onProcess, isProcessing, compact = false }: SceneCardProps) {
   const [expanded, setExpanded] = useState(false)
   const beats = scene.beats_json ? JSON.parse(scene.beats_json) : []
 
   return (
-    <div className="neon-card rounded-lg p-6 space-y-4 hover:shadow-neon-purple/20 transition-all duration-300">
+    <div className={`neon-card rounded-lg hover:shadow-neon-purple/20 transition-all duration-300 ${
+      compact ? 'p-4 space-y-2' : 'p-6 space-y-4'
+    }`}>
       <div className="flex justify-between items-start">
         <div className="space-y-2">
           <h3 className="text-lg font-display font-semibold gradient-text">

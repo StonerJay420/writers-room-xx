@@ -60,4 +60,50 @@
     @apply bg-gradient-to-r from-neon-purple via-neon-pink to-neon-cyan;
     @apply bg-clip-text text-transparent;
   }
+
+  .hologram-effect {
+    position: relative;
+  }
+  
+  .hologram-effect::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, 
+      transparent 48%, 
+      rgba(var(--neon-cyan), 0.03) 50%, 
+      transparent 52%);
+    pointer-events: none;
+    animation: hologram 3s linear infinite;
+  }
+  
+  @keyframes hologram {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  .animate-glow {
+    animation: glow 2s ease-in-out infinite alternate;
+  }
+
+  /* Scrollbar Styling */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: rgba(var(--neon-purple), 0.1);
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: rgba(var(--neon-purple), 0.5);
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(var(--neon-purple), 0.8);
+  }
 }
