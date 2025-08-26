@@ -375,7 +375,7 @@ class ToneMetricsAgent(Agent):
             tools=["analyze_metrics", "assess_readability"]
         )
     
-    def run(self, task: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+    async def run(self, task: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """
         Run the tone & metrics agent.
         

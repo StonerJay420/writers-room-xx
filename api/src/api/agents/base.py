@@ -58,7 +58,7 @@ class Agent(ABC):
         self.llm_client = llm_client
     
     @abstractmethod
-    def run(self, task: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+    async def run(self, task: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """
         Run the agent with given task and context.
         
@@ -180,22 +180,3 @@ class Agent(ABC):
                 logger.info(f"Agent {self.name} cost: ${result['cost_usd']:.6f}")
 
 
-# Schema models for common agent outputs
-class AgentOutput(BaseModel):
-    """Base schema for agent outputs."""
-    agent_name: str
-    success: bool
-    error: Optional[str] = None
-
-
-class DiffOutput(BaseModel):
-    """Schema for agents that produce diffs."""
-    diff: str
-    rationale: List[str]
-
-
-class FindingsOutput(BaseModel):
-    """Schema for agents that produce findings."""
-    findings: List[Dict[str, Any]]
-    receipts: List[Dict[str, str]]
-    diff: str = ""
