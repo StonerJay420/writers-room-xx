@@ -1,7 +1,7 @@
 """ChromaDB client wrapper for vector storage."""
 import chromadb
 from chromadb.config import Settings
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 import numpy as np
 import logging
 
@@ -25,7 +25,7 @@ class ChromaClient:
     def upsert(
         self,
         collection: str,
-        embeddings: np.ndarray,
+        embeddings: Union[np.ndarray, List[List[float]]],
         metadatas: List[Dict[str, Any]],
         ids: List[str]
     ) -> None:
@@ -47,11 +47,12 @@ class ChromaClient:
                 embeddings_list = [embeddings.tolist()]
             else:
                 embeddings_list = embeddings.tolist()
-            embeddings = embeddings_list
+        else:
+            embeddings_list = embeddings
         
         # Upsert to collection
         coll.upsert(
-            embeddings=embeddings,
+            embeddings=embeddings_list,
             metadatas=metadatas,
             ids=ids
         )
@@ -93,8 +94,10 @@ class ChromaClient:
         # Add query embedding or text
         if query_embedding is not None:
             if isinstance(query_embedding, np.ndarray):
-                query_embedding = query_embedding.tolist()
-            query_params["query_embeddings"] = [query_embedding]
+                query_embedding_list = query_embedding.tolist()
+            else:
+                query_embedding_list = query_embedding
+            query_params["query_embeddings"] = [query_embedding_list]
         elif query_text is not None:
             query_params["query_texts"] = [query_text]
         else:
@@ -102,17 +105,17 @@ class ChromaClient:
         
         # Add filters if provided
         if filters:
-            query_params["where"] = filters  # type: ignore
+            query_params["where"] = filters
         
         # Execute query
         results = coll.query(**query_params)
         
         # Flatten results since we always query with single embedding/text
         return {
-            "ids": results["ids"][0] if results["ids"] else [],
-            "distances": results["distances"][0] if results["distances"] else [],
-            "metadatas": results["metadatas"][0] if results["metadatas"] else [],
-            "documents": results.get("documents", [[]])[0]
+            "ids": results["ids"][0] if results.get("ids") and len(results["ids"]) > 0 else [],
+            "distances": results["distances"][0] if results.get("distances") and len(results["distances"]) > 0 else [],
+            "metadatas": results["metadatas"][0] if results.get("metadatas") and len(results["metadatas"]) > 0 else [],
+            "documents": results.get("documents", [[]])[0] if results.get("documents") and len(results.get("documents", [])) > 0 else []
         }
     
     def delete_collection(self, collection: str) -> bool:
