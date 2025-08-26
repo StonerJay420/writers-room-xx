@@ -165,75 +165,76 @@ export function TextEditor({ initialText = '', onSave, fileName }: TextEditorPro
   return (
     <div className="neon-card rounded-lg overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-dark-border">
-        <div className="flex items-center gap-3">
-          <h3 className="font-display font-semibold gradient-text">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 border-b border-dark-border gap-3 sm:gap-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+          <h3 className="font-display font-semibold gradient-text text-base sm:text-lg">
             Text Editor
           </h3>
           {fileName && (
-            <span className="text-sm text-gray-400">
+            <span className="text-xs sm:text-sm text-gray-400 truncate">
               {fileName}
             </span>
           )}
           {hasUnsavedChanges && (
-            <span className="text-xs text-neon-yellow px-2 py-1 bg-neon-yellow/10 rounded-full">
-              Unsaved changes
+            <span className="text-[10px] sm:text-xs text-neon-yellow px-1 sm:px-2 py-0.5 sm:py-1 bg-neon-yellow/10 rounded-full flex-shrink-0">
+              Unsaved
             </span>
           )}
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 w-full sm:w-auto">
           <button
             onClick={getAIRecommendations}
             disabled={isLoadingRecommendations}
-            className="flex items-center gap-2 px-3 py-1 text-sm neon-button rounded"
+            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm neon-button rounded touch-manipulation flex-1 sm:flex-none justify-center"
           >
             {isLoadingRecommendations ? (
-              <RefreshCw size={16} className="animate-spin" />
+              <RefreshCw size={14} className="animate-spin sm:w-4 sm:h-4" />
             ) : (
-              <Wand2 size={16} />
+              <Wand2 size={14} className="sm:w-4 sm:h-4" />
             )}
-            {isLoadingRecommendations ? 'Getting AI suggestions...' : 'Get AI Suggestions'}
+            <span className="hidden sm:inline">{isLoadingRecommendations ? 'Getting AI suggestions...' : 'Get AI Suggestions'}</span>
+            <span className="sm:hidden">AI</span>
           </button>
           
           <button
             onClick={copyToClipboard}
-            className="flex items-center gap-2 px-3 py-1 text-sm neon-button rounded"
+            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm neon-button rounded touch-manipulation"
           >
-            <Copy size={16} />
-            Copy
+            <Copy size={14} className="sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Copy</span>
           </button>
           
           <button
             onClick={handleSave}
             disabled={!hasUnsavedChanges}
-            className="flex items-center gap-2 px-3 py-1 text-sm neon-button rounded disabled:opacity-50"
+            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm neon-button rounded disabled:opacity-50 touch-manipulation"
           >
-            <Save size={16} />
-            Save
+            <Save size={14} className="sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Save</span>
           </button>
         </div>
       </div>
 
       {/* Main editing area */}
-      <div className="flex h-96">
+      <div className="flex flex-col lg:flex-row h-64 sm:h-80 lg:h-96">
         {/* Text Editor */}
-        <div className="flex-1 border-r border-dark-border">
-          <div className="px-4 py-2 bg-dark-surface/50 border-b border-dark-border">
-            <h4 className="text-sm font-medium text-neon-cyan">Your Text</h4>
+        <div className="flex-1 border-b lg:border-b-0 lg:border-r border-dark-border">
+          <div className="px-3 sm:px-4 py-2 bg-dark-surface/50 border-b border-dark-border">
+            <h4 className="text-xs sm:text-sm font-medium text-neon-cyan">Your Text</h4>
           </div>
           <textarea
             value={currentText}
             onChange={(e) => setCurrentText(e.target.value)}
-            className="w-full h-full p-4 bg-transparent text-gray-100 resize-none outline-none font-mono text-sm leading-relaxed"
+            className="w-full h-full p-3 sm:p-4 bg-transparent text-gray-100 resize-none outline-none font-mono text-xs sm:text-sm leading-relaxed"
             placeholder="Start writing your manuscript here..."
           />
         </div>
 
         {/* AI Recommendations Panel */}
-        <div className="w-80">
-          <div className="px-4 py-2 bg-dark-surface/50 border-b border-dark-border">
-            <h4 className="text-sm font-medium text-neon-green">
+        <div className="w-full lg:w-80 h-48 lg:h-full">
+          <div className="px-3 sm:px-4 py-2 bg-dark-surface/50 border-b border-dark-border">
+            <h4 className="text-xs sm:text-sm font-medium text-neon-green">
               AI Recommendations ({recommendations.length})
             </h4>
           </div>

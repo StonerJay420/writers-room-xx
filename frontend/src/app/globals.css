@@ -180,4 +180,36 @@ body {
   ::-webkit-scrollbar-thumb:hover {
     background: rgba(var(--neon-purple), 0.8);
   }
+
+  /* Mobile-specific utilities */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .touch-manipulation {
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  /* Better mobile button sizing */
+  @media (max-width: 640px) {
+    .neon-button {
+      min-height: 44px;
+      min-width: 44px;
+    }
+  }
 }

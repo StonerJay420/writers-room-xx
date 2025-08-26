@@ -100,87 +100,88 @@ export function ManuscriptNavigator({
 
   return (
     <div className="h-full bg-gray-900 border-r border-gray-700 overflow-y-auto">
-      <div className="p-4 border-b border-gray-700">
-        <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-          <BookOpen size={20} />
-          Manuscript
+      <div className="p-3 sm:p-4 border-b border-gray-700">
+        <h2 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
+          <BookOpen size={18} className="sm:w-5 sm:h-5" />
+          <span className="hidden sm:block">Manuscript</span>
+          <span className="block sm:hidden">MS</span>
         </h2>
       </div>
       
-      <div className="p-2">
+      <div className="p-1 sm:p-2">
         {acts.map(act => (
           <div key={act.id} className="mb-2">
             {/* Act Header */}
             <div 
-              className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-800 cursor-pointer group"
+              className="flex items-center gap-1 sm:gap-2 p-2 sm:p-3 rounded-lg hover:bg-gray-800 cursor-pointer group touch-manipulation"
               onClick={() => toggleAct(act.id)}
             >
               {navState.expandedActs.has(act.id) ? (
-                <ChevronDown size={16} className="text-gray-400" />
+                <ChevronDown size={14} className="text-gray-400 sm:w-4 sm:h-4" />
               ) : (
-                <ChevronRight size={16} className="text-gray-400" />
+                <ChevronRight size={14} className="text-gray-400 sm:w-4 sm:h-4" />
               )}
-              <BookOpen size={16} className="text-neon-purple" />
-              <span className="text-white font-medium">{act.title}</span>
-              <span className="text-gray-400 text-sm ml-auto">{act.chapters.length} chapters</span>
+              <BookOpen size={14} className="text-neon-purple sm:w-4 sm:h-4" />
+              <span className="text-white font-medium text-sm sm:text-base truncate">{act.title}</span>
+              <span className="text-gray-400 text-xs sm:text-sm ml-auto hidden sm:block">{act.chapters.length} ch</span>
             </div>
             
             {/* Chapters */}
             {navState.expandedActs.has(act.id) && (
-              <div className="ml-4 mt-1">
+              <div className="ml-2 sm:ml-4 mt-1">
                 {act.chapters.map(chapter => (
                   <div key={chapter.id} className="mb-1">
                     {/* Chapter Header */}
-                    <div className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-800 cursor-pointer group">
+                    <div className="flex items-center gap-1 sm:gap-2 p-2 rounded-lg hover:bg-gray-800 cursor-pointer group touch-manipulation">
                       <div 
-                        className="flex items-center gap-2 flex-1"
+                        className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0"
                         onClick={() => toggleChapter(chapter.id)}
                       >
                         {navState.expandedChapters.has(chapter.id) ? (
-                          <ChevronDown size={14} className="text-gray-400" />
+                          <ChevronDown size={12} className="text-gray-400 sm:w-[14px] sm:h-[14px] flex-shrink-0" />
                         ) : (
-                          <ChevronRight size={14} className="text-gray-400" />
+                          <ChevronRight size={12} className="text-gray-400 sm:w-[14px] sm:h-[14px] flex-shrink-0" />
                         )}
-                        <FileText size={14} className="text-neon-cyan" />
-                        <span className="text-gray-200 text-sm">{chapter.title}</span>
-                        <span className="text-gray-500 text-xs ml-auto">{chapter.scenes.length} scenes</span>
+                        <FileText size={12} className="text-neon-cyan sm:w-[14px] sm:h-[14px] flex-shrink-0" />
+                        <span className="text-gray-200 text-xs sm:text-sm truncate">{chapter.title}</span>
+                        <span className="text-gray-500 text-[10px] sm:text-xs ml-auto flex-shrink-0">{chapter.scenes.length}</span>
                       </div>
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
                           handleCreateScene(chapter.id)
                         }}
-                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-700 transition-opacity"
+                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-700 transition-opacity touch-manipulation flex-shrink-0"
                         title="Add scene"
                       >
-                        <Plus size={12} className="text-neon-green" />
+                        <Plus size={10} className="text-neon-green sm:w-3 sm:h-3" />
                       </button>
                     </div>
                     
                     {/* Scenes */}
                     {navState.expandedChapters.has(chapter.id) && (
-                      <div className="ml-6 mt-1 space-y-1">
+                      <div className="ml-4 sm:ml-6 mt-1 space-y-1">
                         {chapter.scenes.map(scene => (
                           <div 
                             key={scene.id}
-                            className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer group transition-colors ${
+                            className={`flex items-center gap-1 sm:gap-2 p-2 rounded-lg cursor-pointer group transition-colors touch-manipulation ${
                               selectedSceneId === scene.id 
                                 ? 'bg-neon-purple/20 border border-neon-purple/50' 
                                 : 'hover:bg-gray-800'
                             }`}
                             onClick={() => onSceneSelect(scene)}
                           >
-                            <Edit3 size={12} className="text-neon-pink" />
-                            <span className="text-gray-300 text-sm flex-1">
+                            <Edit3 size={10} className="text-neon-pink sm:w-3 sm:h-3 flex-shrink-0" />
+                            <span className="text-gray-300 text-xs sm:text-sm flex-1 truncate">
                               Scene {scene.order_in_chapter}
                             </span>
                             {scene.pov && (
-                              <span className="text-neon-cyan text-xs bg-gray-800 px-2 py-1 rounded">
+                              <span className="text-neon-cyan text-[9px] sm:text-xs bg-gray-800 px-1 sm:px-2 py-0.5 sm:py-1 rounded flex-shrink-0">
                                 {scene.pov}
                               </span>
                             )}
                             {scene.location && (
-                              <span className="text-neon-green text-xs bg-gray-800 px-2 py-1 rounded">
+                              <span className="text-neon-green text-[9px] sm:text-xs bg-gray-800 px-1 sm:px-2 py-0.5 sm:py-1 rounded flex-shrink-0">
                                 {scene.location}
                               </span>
                             )}

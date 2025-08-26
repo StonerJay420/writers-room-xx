@@ -94,27 +94,27 @@ export function SceneCreateForm({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-gray-700">
-          <h2 className="text-xl font-semibold text-white">Create New Scene</h2>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-gray-900 rounded-lg max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-700">
+          <h2 className="text-lg sm:text-xl font-semibold text-white">Create New Scene</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors"
+            className="text-gray-400 hover:text-white transition-colors touch-manipulation p-1"
           >
-            <X size={24} />
+            <X size={20} className="sm:w-6 sm:h-6" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6">
           {error && (
-            <div className="bg-red-900/20 border border-red-500 rounded-lg p-4 text-red-300">
+            <div className="bg-red-900/20 border border-red-500 rounded-lg p-3 sm:p-4 text-red-300 text-sm">
               {error}
             </div>
           )}
 
           {/* Chapter and Scene Order */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Chapter
@@ -127,7 +127,7 @@ export function SceneCreateForm({
                   ...prev, 
                   chapter: parseInt(e.target.value) || 1 
                 }))}
-                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:border-neon-purple focus:ring-1 focus:ring-neon-purple"
+                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:border-neon-purple focus:ring-1 focus:ring-neon-purple text-sm sm:text-base"
                 required
               />
             </div>
@@ -143,7 +143,7 @@ export function SceneCreateForm({
                   ...prev, 
                   order_in_chapter: parseInt(e.target.value) || 1 
                 }))}
-                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:border-neon-purple focus:ring-1 focus:ring-neon-purple"
+                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:border-neon-purple focus:ring-1 focus:ring-neon-purple text-sm sm:text-base"
                 required
               />
             </div>
@@ -173,7 +173,7 @@ export function SceneCreateForm({
                 type="text"
                 value={formData.pov}
                 onChange={(e) => setFormData(prev => ({ ...prev, pov: e.target.value }))}
-                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:border-neon-purple focus:ring-1 focus:ring-neon-purple"
+                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:border-neon-purple focus:ring-1 focus:ring-neon-purple text-sm sm:text-base"
                 placeholder="Character name"
               />
             </div>
@@ -185,7 +185,7 @@ export function SceneCreateForm({
                 type="text"
                 value={formData.location}
                 onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:border-neon-purple focus:ring-1 focus:ring-neon-purple"
+                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:border-neon-purple focus:ring-1 focus:ring-neon-purple text-sm sm:text-base"
                 placeholder="Scene location"
               />
             </div>

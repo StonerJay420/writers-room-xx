@@ -236,19 +236,19 @@ export default function Home() {
                       </div>
                     )}
                   </div>
-                  <div className="flex gap-3">
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                     <button
                       onClick={() => processScene(selectedScene.id)}
                       disabled={processingScene === selectedScene.id}
-                      className="bg-neon-purple hover:bg-neon-purple/80 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+                      className="bg-neon-purple hover:bg-neon-purple/80 text-white px-3 sm:px-4 py-2 sm:py-3 rounded-lg disabled:opacity-50 text-sm sm:text-base touch-manipulation"
                     >
                       {processingScene === selectedScene.id ? 'Processing...' : 'Process Scene'}
                     </button>
                     <button
                       onClick={() => openSceneInEditor(selectedScene)}
-                      className="bg-neon-cyan hover:bg-neon-cyan/80 text-white px-4 py-2 rounded-lg"
+                      className="bg-neon-cyan hover:bg-neon-cyan/80 text-white px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-sm sm:text-base touch-manipulation"
                     >
-                      <Edit size={16} className="inline mr-2" />
+                      <Edit size={14} className="inline mr-2 sm:w-4 sm:h-4" />
                       Edit with AI
                     </button>
                   </div>
@@ -345,19 +345,19 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-dark-bg text-gray-100">
-      <div className="container mx-auto px-4 py-8">
-        <div className="space-y-8">
+      <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
+        <div className="space-y-4 sm:space-y-8">
           {/* Header */}
           <div className="text-center">
-            <h1 className="text-6xl font-display font-bold gradient-text animate-glow mb-4">
+            <h1 className="text-3xl sm:text-4xl lg:text-6xl font-display font-bold gradient-text animate-glow mb-2 sm:mb-4">
               Writers Room X
             </h1>
-            <p className="text-neon-cyan/60 font-mono text-lg">
+            <p className="text-neon-cyan/60 font-mono text-sm sm:text-lg">
               Multi-Agent AI Manuscript Editor
             </p>
             <div className="flex justify-center items-center gap-2 mt-2">
               <div className="w-2 h-2 rounded-full bg-neon-green animate-pulse"></div>
-              <p className="text-gray-400 text-sm">
+              <p className="text-gray-400 text-xs sm:text-sm">
                 {scenes.length} scenes loaded
               </p>
             </div>
@@ -372,7 +372,7 @@ export default function Home() {
             />
             
             {/* Tab Content */}
-            <div className="p-8">
+            <div className="p-4 sm:p-6 lg:p-8">
               {renderTabContent()}
             </div>
           </div>

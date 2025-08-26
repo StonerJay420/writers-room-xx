@@ -435,23 +435,23 @@ export function AppSettings({ modelPreferences, onModelChange }: AppSettingsProp
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
         {agents.map((agent) => (
-          <div key={agent.id} className="neon-card rounded-lg p-6">
-            <div className="flex items-start gap-4">
-              <div className="text-2xl p-3 rounded-lg bg-neon-purple/10">
+          <div key={agent.id} className="neon-card rounded-lg p-4 sm:p-6">
+            <div className="flex items-start gap-3 sm:gap-4">
+              <div className="text-xl sm:text-2xl p-2 sm:p-3 rounded-lg bg-neon-purple/10 flex-shrink-0">
                 {agent.icon}
               </div>
-              <div className="flex-1">
-                <h4 className="text-lg font-semibold text-neon-purple mb-1">
+              <div className="flex-1 min-w-0">
+                <h4 className="text-base sm:text-lg font-semibold text-neon-purple mb-1 truncate">
                   {agent.name}
                 </h4>
-                <p className="text-gray-400 text-sm mb-4">
+                <p className="text-gray-400 text-xs sm:text-sm mb-3 sm:mb-4 line-clamp-2">
                   {agent.description}
                 </p>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-300 mb-2">
                     AI Model
                   </label>
                   <ModelSelector
@@ -483,10 +483,10 @@ export function AppSettings({ modelPreferences, onModelChange }: AppSettingsProp
       <div className="neon-card rounded-lg p-6">
         <h4 className="font-semibold mb-4">Theme</h4>
         <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
             <button
               onClick={() => setTheme('light')}
-              className={`p-4 rounded-lg border-2 transition-all ${
+              className={`p-3 sm:p-4 rounded-lg border-2 transition-all touch-manipulation ${
                 theme === 'light'
                   ? 'border-neon-cyan bg-neon-cyan/10'
                   : 'border-dark-border hover:border-gray-600'
