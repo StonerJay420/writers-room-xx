@@ -629,6 +629,9 @@ body{
 .z-\[9999\]{
   z-index: 9999;
 }
+.z-\[99999\]{
+  z-index: 99999;
+}
 .mx-auto{
   margin-left: auto;
   margin-right: auto;
