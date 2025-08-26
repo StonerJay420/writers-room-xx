@@ -267,6 +267,10 @@ export function AppSettings({ modelPreferences, onModelChange }: AppSettingsProp
     setError(null)
 
     try {
+      // Test AI status endpoint
+      const statusResponse = await api.get('/ai/status')
+
+      // Then test AI recommendations
       const testText = "This is a test sentence to verify AI connectivity."
       const response = await api.post<{recommendations: any[], total: number, processing_time: number}>('/ai/recommendations', {
         text: testText,
@@ -280,16 +284,14 @@ export function AppSettings({ modelPreferences, onModelChange }: AppSettingsProp
         setAiTestResult('⚠️ AI connected but no recommendations returned (this is normal for short test text).')
       }
 
-      // Also test AI status endpoint
-      const statusResponse = await api.get('/ai/status')
-      console.log('AI Status:', statusResponse)
-
     } catch (error: any) {
       console.error('AI test failed:', error)
       if (error.message.includes('401')) {
         setAiTestResult('❌ Authentication failed. Please check your API key configuration.')
       } else if (error.message.includes('403')) {
         setAiTestResult('❌ API key invalid or insufficient permissions.')
+      } else if (error.message.includes('404')) {
+        setAiTestResult('❌ AI endpoints not found. Check backend configuration.')
       } else {
         setAiTestResult('❌ AI connection failed: ' + (error.message || 'Unknown error'))
       }

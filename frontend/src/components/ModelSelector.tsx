@@ -111,7 +111,7 @@ export function ModelSelector({ agentName, currentModel, onModelChange }: ModelS
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-2 neon-card rounded-lg shadow-xl max-h-96 overflow-y-auto">
+        <div className="absolute z-[9999] w-full mt-2 neon-card rounded-lg shadow-xl max-h-96 overflow-y-auto">
           {Object.entries(groupedModels).map(([provider, providerModels]) => (
             <div key={provider} className="border-b border-dark-border last:border-b-0">
               <div className={`px-4 py-2 text-xs font-semibold uppercase tracking-wider bg-dark-surface/50 ${getProviderColor(provider)}`}>

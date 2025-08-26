@@ -55,10 +55,10 @@ export class AuthManager {
   }
   
   static async hasOpenRouterKey(): Promise<boolean> {
-    const apiKey = this.getApiKey()
-    if (!apiKey) return false
-    
     try {
+      // Ensure we have a session first
+      const apiKey = await this.getOrCreateSession()
+      
       const response = await fetch('/api/auth/llm-key', {
         headers: {
           'Authorization': `Bearer ${apiKey}`

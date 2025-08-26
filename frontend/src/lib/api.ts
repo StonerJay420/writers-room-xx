@@ -1,9 +1,7 @@
 import { AuthManager } from './auth'
 
-// Use relative URL in browser to leverage Next.js proxy, absolute URL for server-side
-const API_BASE = typeof window !== 'undefined' 
-  ? '' // Use relative URLs in browser for Next.js proxy
-  : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+// Use NEXT_PUBLIC_API_URL if set, otherwise use Next.js proxy for relative URLs
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || ''
 
 class ApiClient {
   private baseURL: string
@@ -44,7 +42,13 @@ class ApiClient {
       ...options,
     }
 
-    const response = await fetch(url, config)
+    let response: Response
+    try {
+      response = await fetch(url, config)
+    } catch (error) {
+      const networkError = error as Error
+      throw new Error(`Network error contacting API at ${url}: ${networkError.message || 'Connection failed'}`)
+    }
 
     if (!response.ok) {
       const errorText = await response.text()
