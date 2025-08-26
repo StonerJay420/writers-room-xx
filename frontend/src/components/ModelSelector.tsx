@@ -112,13 +112,11 @@ export function ModelSelector({ agentName, currentModel, onModelChange }: ModelS
       </button>
 
       {isOpen && (
-        <div className="fixed z-[99999] mt-2 neon-card rounded-lg shadow-xl max-h-96 overflow-y-auto" 
+        <div className="absolute z-[99999] left-0 mt-2 neon-card rounded-lg shadow-xl max-h-96 overflow-y-auto" 
              style={{ 
                minWidth: '350px',
                width: 'max-content',
-               maxWidth: '500px',
-               top: containerRef.current ? containerRef.current.getBoundingClientRect().bottom + 8 : 0,
-               left: containerRef.current ? containerRef.current.getBoundingClientRect().left : 0
+               maxWidth: '500px'
              }}>
           {Object.entries(groupedModels).map(([provider, providerModels]) => (
             <div key={provider} className="border-b border-dark-border last:border-b-0">

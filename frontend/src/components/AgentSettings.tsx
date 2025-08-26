@@ -92,7 +92,7 @@ export function AgentSettings({ modelPreferences, onModelChange }: AgentSettings
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 overflow-visible">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -152,7 +152,7 @@ export function AgentSettings({ modelPreferences, onModelChange }: AgentSettings
       </div>
 
       {/* Agent Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 overflow-visible">
         {agents.map((agent) => (
           <div key={agent.id} className="neon-card rounded-lg p-6 space-y-4 overflow-visible">
             <div className="flex items-start gap-4">
