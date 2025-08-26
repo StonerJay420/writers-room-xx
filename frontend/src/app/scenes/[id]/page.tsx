@@ -192,7 +192,6 @@ export default function ScenePage() {
             <DiffViewer
               originalText={scene.content}
               modifiedText={currentPatch?.diff || scene.content}
-              isDiff={!!currentPatch}
             />
           </div>
 
