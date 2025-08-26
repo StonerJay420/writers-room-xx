@@ -154,7 +154,7 @@ export function AgentSettings({ modelPreferences, onModelChange }: AgentSettings
       {/* Agent Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {agents.map((agent) => (
-          <div key={agent.id} className="neon-card rounded-lg p-6 space-y-4">
+          <div key={agent.id} className="neon-card rounded-lg p-6 space-y-4 overflow-visible">
             <div className="flex items-start gap-4">
               <div className="text-2xl p-3 rounded-lg bg-neon-purple/10">
                 {agent.icon}
@@ -185,15 +185,17 @@ export function AgentSettings({ modelPreferences, onModelChange }: AgentSettings
               </div>
             </div>
             
-            <div className="border-t border-dark-border pt-4">
+            <div className="border-t border-dark-border pt-4 overflow-visible relative z-10">
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 AI Model
               </label>
-              <ModelSelector
-                agentName={agent.id}
-                currentModel={modelPreferences[agent.id as keyof ModelPreferences]}
-                onModelChange={handleModelChange}
-              />
+              <div className="overflow-visible">
+                <ModelSelector
+                  agentName={agent.id}
+                  currentModel={modelPreferences[agent.id as keyof ModelPreferences]}
+                  onModelChange={handleModelChange}
+                />
+              </div>
             </div>
           </div>
         ))}
