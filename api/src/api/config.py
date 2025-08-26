@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     # App Settings
     app_name: str = Field(default="Writers Room X", alias="APP_NAME")
     debug: bool = Field(default=False, alias="DEBUG")
+    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     cors_origins: list[str] = Field(
         default=["http://localhost:3000", "http://localhost:5000"],
         alias="CORS_ORIGINS"

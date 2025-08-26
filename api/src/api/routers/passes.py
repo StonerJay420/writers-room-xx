@@ -103,29 +103,54 @@ async def run_pass(
         agent_results = {}
         
         if "lore_archivist" in request.agents:
-            lore_result = await run_lore_archivist(
-                scene_text=scene_text,
-                scene_meta=scene_meta,
-                retrieve_fn=lambda q, k, f: retrieve_canon(q, k, f) if 'retrieve_canon' in globals() else [],
-                model="anthropic/claude-3-opus"
-            )
-            agent_results["lore_archivist"] = lore_result
+            try:
+                lore_result = await run_lore_archivist(
+                    scene_text=scene_text,
+                    scene_meta=scene_meta,
+                    retrieve_fn=lambda q, k, f: retrieve_canon(q, k, f) if 'retrieve_canon' in globals() else [],
+                    model="anthropic/claude-3-opus"
+                )
+                agent_results["lore_archivist"] = lore_result
+            except Exception as e:
+                agent_results["lore_archivist"] = {
+                    "error": f"Lore Archivist failed: {str(e)}",
+                    "status": "failed",
+                    "findings": [],
+                    "receipts": []
+                }
         
         if "grim_editor" in request.agents:
-            grim_result = await run_grim_editor(
-                scene_text=scene_text,
-                style_targets=metrics_config,
-                model="anthropic/claude-3-haiku"
-            )
-            agent_results["grim_editor"] = grim_result
+            try:
+                grim_result = await run_grim_editor(
+                    scene_text=scene_text,
+                    style_targets=metrics_config,
+                    model="anthropic/claude-3-haiku"
+                )
+                agent_results["grim_editor"] = grim_result
+            except Exception as e:
+                agent_results["grim_editor"] = {
+                    "error": f"Grim Editor failed: {str(e)}",
+                    "status": "failed",
+                    "diff": "",
+                    "rationale": [f"Editor execution failed: {str(e)}"]
+                }
         
         if "tone_metrics" in request.agents:
-            tone_result = run_tone_metrics(
-                scene_text=scene_text,
-                targets=metrics_config,
-                model="anthropic/claude-3-haiku"
-            )
-            agent_results["tone_metrics"] = tone_result
+            try:
+                tone_result = run_tone_metrics(
+                    scene_text=scene_text,
+                    targets=metrics_config,
+                    model="anthropic/claude-3-haiku"
+                )
+                agent_results["tone_metrics"] = tone_result
+            except Exception as e:
+                agent_results["tone_metrics"] = {
+                    "error": f"Tone Metrics failed: {str(e)}",
+                    "status": "failed",
+                    "metrics_before": {},
+                    "overall_assessment": f"Analysis failed: {str(e)}",
+                    "recommendations": ["Please review the scene text and try again"]
+                }
         
         # Combine results into variants
         variants = supervisor_result.get("variants", {})

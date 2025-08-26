@@ -6,12 +6,14 @@ from typing import Dict, Any
 
 from .config import settings
 from .db import init_database
+from .utils.logging_config import setup_logging
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan management."""
     # Startup
+    setup_logging(log_level=settings.log_level)
     print(f"Starting {settings.app_name}...")
     await init_database()
     yield

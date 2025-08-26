@@ -52,6 +52,7 @@ class Agent(ABC):
         self.model = model
         self.tools = tools or []
         self.llm_client: Optional['LLMClient'] = None
+        self.logger = logging.getLogger(f"{__name__}.{name}")
     
     def set_llm_client(self, llm_client: 'LLMClient') -> None:
         """Set the LLM client for API calls."""
@@ -70,6 +71,97 @@ class Agent(ABC):
             Agent result dictionary
         """
         pass
+    
+    async def run_with_error_handling(self, task: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Execute the agent with comprehensive error handling.
+        
+        Args:
+            task: Task parameters specific to the agent
+            context: Shared context including settings, retrieved data, etc.
+            
+        Returns:
+            Dictionary with agent results or error information
+        """
+        import time
+        
+        start_time = time.time()
+        
+        try:
+            logger.info(f"Starting {self.name} agent execution")
+            
+            # Validate input parameters
+            if not isinstance(task, dict):
+                raise ValueError("Task parameter must be a dictionary")
+            if not isinstance(context, dict):
+                raise ValueError("Context parameter must be a dictionary")
+            
+            # Execute the agent
+            result = await self.run(task, context)
+            
+            # Ensure result is a dictionary
+            if not isinstance(result, dict):
+                logger.warning(f"Agent {self.name} returned non-dict result, wrapping")
+                result = {"data": result, "agent": self.name}
+            
+            # Add execution metadata
+            result.update({
+                "agent": self.name,
+                "status": "success",
+                "execution_time": time.time() - start_time,
+                "timestamp": time.time()
+            })
+            
+            logger.info(f"Completed {self.name} agent execution successfully in {result['execution_time']:.2f}s")
+            return result
+            
+        except NotImplementedError as e:
+            error_result = {
+                "error": f"Agent {self.name} not fully implemented: {str(e)}",
+                "error_type": "NotImplementedError",
+                "agent": self.name,
+                "status": "not_implemented",
+                "execution_time": time.time() - start_time,
+                "timestamp": time.time()
+            }
+            logger.error(f"Agent {self.name} not implemented: {str(e)}")
+            return error_result
+            
+        except ValueError as e:
+            error_result = {
+                "error": f"Invalid input for agent {self.name}: {str(e)}",
+                "error_type": "ValueError",
+                "agent": self.name,
+                "status": "invalid_input",
+                "execution_time": time.time() - start_time,
+                "timestamp": time.time()
+            }
+            logger.error(f"Agent {self.name} received invalid input: {str(e)}")
+            return error_result
+            
+        except TimeoutError as e:
+            error_result = {
+                "error": f"Agent {self.name} execution timed out: {str(e)}",
+                "error_type": "TimeoutError",
+                "agent": self.name,
+                "status": "timeout",
+                "execution_time": time.time() - start_time,
+                "timestamp": time.time()
+            }
+            logger.error(f"Agent {self.name} execution timed out: {str(e)}")
+            return error_result
+            
+        except Exception as e:
+            error_result = {
+                "error": f"Agent {self.name} execution failed: {str(e)}",
+                "error_type": type(e).__name__,
+                "agent": self.name,
+                "status": "failed",
+                "execution_time": time.time() - start_time,
+                "timestamp": time.time()
+            }
+            logger.error(f"Agent {self.name} execution failed: {str(e)}", exc_info=True)
+            return error_result
     
     def validate_json_schema(self, data: Any, schema_model: Type[BaseModel]) -> Dict[str, Any]:
         """
