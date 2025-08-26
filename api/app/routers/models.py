@@ -10,7 +10,7 @@ router = APIRouter(prefix="/models", tags=["models"])
 
 class AgentConfigRequest(BaseModel):
     agent_name: str
-    model_id: str
+    llm_model_id: str
 
 
 class ModelPreferences(BaseModel):
@@ -73,10 +73,10 @@ async def get_model_preferences() -> Dict[str, str]:
 async def update_agent_model(request: Dict[str, str]) -> Dict[str, str]:
     """Update model configuration for a specific agent."""
     agent_name = request.get("agent_name")
-    model_id = request.get("model_id")
+    model_id = request.get("llm_model_id")
 
     if not agent_name or not model_id:
-        raise HTTPException(status_code=400, detail="Missing agent_name or model_id")
+        raise HTTPException(status_code=400, detail="Missing agent_name or llm_model_id")
 
     # In a real implementation, you'd save this to a config store
     return {"status": "success", "agent": agent_name, "model": model_id}

@@ -102,7 +102,7 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           agent_name: agentName,
-          model_id: modelId
+          llm_model_id: modelId
         })
       })
       

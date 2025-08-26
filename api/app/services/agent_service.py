@@ -17,7 +17,7 @@ from ..db import get_write_session
 class AgentResult:
     """Result from a single agent pass."""
     agent_name: str
-    model_id: str
+    llm_model_id: str
     original_text: str
     revised_text: str
     reasoning: str
@@ -132,7 +132,7 @@ class AgentService:
                             metadata=json.dumps({
                                 "variant": variant_name,
                                 "agent": agent_result.agent_name,
-                                "model": agent_result.model_id,
+                                "model": agent_result.llm_model_id,
                                 "cost": agent_result.cost_usd
                             })
                         )
@@ -276,7 +276,7 @@ class AgentService:
         
         return AgentResult(
             agent_name=agent_name,
-            model_id=model_id,
+            llm_model_id=model_id,
             original_text=current_text,
             revised_text=revised_text,
             reasoning=reasoning,
