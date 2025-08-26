@@ -5,7 +5,7 @@ import { BarChart3, FileText, Settings, Upload, Home as HomeIcon, Library } from
 import { Tabs } from '@/components/Tabs'
 import { Dashboard } from '@/components/Dashboard'
 import { SceneLibrary } from '@/components/SceneLibrary'
-import { AgentSettings } from '@/components/AgentSettings'
+import { AppSettings } from '@/components/AppSettings'
 import { FileManager } from '@/components/FileManager'
 import { Scene, ModelPreferences } from '@/types'
 
@@ -136,7 +136,7 @@ export default function Home() {
     },
     {
       id: 'settings',
-      label: 'Agent Settings',
+      label: 'Settings',
       icon: <Settings size={16} />,
     },
     {
@@ -172,7 +172,7 @@ export default function Home() {
         )
       case 'settings':
         return (
-          <AgentSettings
+          <AppSettings
             modelPreferences={modelPreferences}
             onModelChange={handleModelChange}
           />

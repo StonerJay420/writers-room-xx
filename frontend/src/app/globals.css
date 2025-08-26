@@ -3,6 +3,80 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme Support */
+:root {
+  --background: #0f0f23;
+  --foreground: #e2e8f0;
+  --card: #1e1e3f;
+  --card-foreground: #e2e8f0;
+  --border: #333366;
+  --neon-cyan: #00ffff;
+  --neon-green: #00ff41;
+  --neon-pink: #ff1493;
+  --neon-purple: #9d4edd;
+  --neon-yellow: #ffff00;
+  --neon-blue: #00bfff;
+}
+
+.light {
+  --background: #ffffff;
+  --foreground: #1e293b;
+  --card: #f8fafc;
+  --card-foreground: #1e293b;
+  --border: #e2e8f0;
+  --neon-cyan: #0891b2;
+  --neon-green: #16a34a;
+  --neon-pink: #e11d48;
+  --neon-purple: #8b5cf6;
+  --neon-yellow: #ca8a04;
+  --neon-blue: #0284c7;
+}
+
+/* Apply theme variables */
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+.neon-card {
+  background-color: var(--card);
+  color: var(--card-foreground);
+  border-color: var(--border);
+}
+
+.dark-surface {
+  background-color: var(--card);
+}
+
+.dark-border {
+  border-color: var(--border);
+}
+
+.dark-bg {
+  background-color: var(--background);
+}
+
+.text-neon-cyan { color: var(--neon-cyan); }
+.text-neon-green { color: var(--neon-green); }
+.text-neon-pink { color: var(--neon-pink); }
+.text-neon-purple { color: var(--neon-purple); }
+.text-neon-yellow { color: var(--neon-yellow); }
+.text-neon-blue { color: var(--neon-blue); }
+
+.border-neon-cyan { border-color: var(--neon-cyan); }
+.border-neon-green { border-color: var(--neon-green); }
+.border-neon-pink { border-color: var(--neon-pink); }
+.border-neon-purple { border-color: var(--neon-purple); }
+.border-neon-yellow { border-color: var(--neon-yellow); }
+.border-neon-blue { border-color: var(--neon-blue); }
+
+.bg-neon-cyan { background-color: var(--neon-cyan); }
+.bg-neon-green { background-color: var(--neon-green); }
+.bg-neon-pink { background-color: var(--neon-pink); }
+.bg-neon-purple { background-color: var(--neon-purple); }
+.bg-neon-yellow { background-color: var(--neon-yellow); }
+.bg-neon-blue { background-color: var(--neon-blue); }
+
 @layer base {
   :root {
     --neon-purple: 191, 0, 255;
