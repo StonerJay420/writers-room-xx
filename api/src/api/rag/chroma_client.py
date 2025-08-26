@@ -52,8 +52,8 @@ class ChromaClient:
         
         # Upsert to collection
         coll.upsert(
-            embeddings=embeddings_list,
-            metadatas=metadatas,
+            embeddings=embeddings_list,  # type: ignore
+            metadatas=metadatas,  # type: ignore
             ids=ids
         )
         
@@ -86,36 +86,37 @@ class ChromaClient:
             logger.warning(f"Collection '{collection}' not found: {e}")
             return {"ids": [], "distances": [], "metadatas": []}
         
-        # Build query parameters
-        query_params = {
-            "n_results": top_k
-        }
-        
-        # Add query embedding or text
+        # Execute query based on input type
         if query_embedding is not None:
             if isinstance(query_embedding, np.ndarray):
                 query_embedding_list = query_embedding.tolist()
             else:
                 query_embedding_list = query_embedding
-            query_params["query_embeddings"] = [query_embedding_list]
+            results = coll.query(
+                query_embeddings=[query_embedding_list],
+                n_results=top_k,
+                where=filters
+            )
         elif query_text is not None:
-            query_params["query_texts"] = [query_text]
+            results = coll.query(
+                query_texts=[query_text],
+                n_results=top_k,
+                where=filters
+            )
         else:
             raise ValueError("Either query_text or query_embedding must be provided")
         
-        # Add filters if provided
-        if filters:
-            query_params["where"] = filters
-        
-        # Execute query
-        results = coll.query(**query_params)
-        
         # Flatten results since we always query with single embedding/text
+        ids_list = results.get("ids") or [[]]
+        distances_list = results.get("distances") or [[]]
+        metadatas_list = results.get("metadatas") or [[]]
+        documents_list = results.get("documents") or [[]]
+        
         return {
-            "ids": results["ids"][0] if results.get("ids") and len(results["ids"]) > 0 else [],
-            "distances": results["distances"][0] if results.get("distances") and len(results["distances"]) > 0 else [],
-            "metadatas": results["metadatas"][0] if results.get("metadatas") and len(results["metadatas"]) > 0 else [],
-            "documents": results.get("documents", [[]])[0] if results.get("documents") and len(results.get("documents", [])) > 0 else []
+            "ids": ids_list[0] if len(ids_list) > 0 else [],
+            "distances": distances_list[0] if len(distances_list) > 0 else [],
+            "metadatas": metadatas_list[0] if len(metadatas_list) > 0 else [],
+            "documents": documents_list[0] if len(documents_list) > 0 else []
         }
     
     def delete_collection(self, collection: str) -> bool:

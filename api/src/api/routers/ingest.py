@@ -32,7 +32,7 @@ async def upload_file(
     file_type: str = Form(..., description="Either 'manuscript' or 'codex'")
 ):
     """Upload a markdown file."""
-    if not file.filename.endswith('.md'):
+    if not file.filename or not file.filename.endswith('.md'):
         raise HTTPException(status_code=400, detail="Only .md files are allowed")
 
     if file_type not in ['manuscript', 'codex']:
