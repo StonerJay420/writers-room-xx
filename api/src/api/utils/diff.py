@@ -5,6 +5,13 @@ from typing import List
 import re
 import logging
 
+try:
+    from rapidfuzz import fuzz
+    RAPIDFUZZ_AVAILABLE = True
+except ImportError:
+    RAPIDFUZZ_AVAILABLE = False
+    fuzz = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -23,6 +30,12 @@ def make_unified_diff(original: str, revised: str, filename: str) -> str:
     original_lines = original.splitlines(keepends=True)
     revised_lines = revised.splitlines(keepends=True)
     
+    # Ensure lines end with newlines for proper diff formatting
+    if original_lines and not original_lines[-1].endswith('\n'):
+        original_lines[-1] += '\n'
+    if revised_lines and not revised_lines[-1].endswith('\n'):
+        revised_lines[-1] += '\n'
+    
     diff_lines = list(difflib.unified_diff(
         original_lines,
         revised_lines,
@@ -31,7 +44,7 @@ def make_unified_diff(original: str, revised: str, filename: str) -> str:
         lineterm=""
     ))
     
-    return "".join(diff_lines)
+    return "\n".join(diff_lines) + ("\n" if diff_lines else "")
 
 
 def apply_patch_to_file(file_path: str, unified_diff: str) -> bool:
@@ -137,13 +150,15 @@ def _apply_hunk(lines: List[str], hunk: dict) -> bool:
                 
                 actual_line = lines[temp_idx]
                 if change.startswith(' ') and expected_line != actual_line:
-                    # Try fuzzy matching for context lines
-                    if expected_line.strip() != actual_line.strip():
+                    # Try fuzzy matching for context lines with rapidfuzz
+                    if not _lines_match_fuzzy(expected_line, actual_line):
                         logger.error(f"Context mismatch at line {temp_idx + 1}")
                         return False
                 elif change.startswith('-') and expected_line != actual_line:
-                    logger.error(f"Deletion line mismatch at line {temp_idx + 1}")
-                    return False
+                    # Allow fuzzy matching for deletion lines too
+                    if not _lines_match_fuzzy(expected_line, actual_line):
+                        logger.error(f"Deletion line mismatch at line {temp_idx + 1}")
+                        return False
                 
                 temp_idx += 1
         
@@ -173,3 +188,52 @@ def _apply_hunk(lines: List[str], hunk: dict) -> bool:
     except Exception as e:
         logger.error(f"Error applying hunk: {e}")
         return False
+
+
+def _lines_match_fuzzy(expected: str, actual: str, threshold: float = 0.85) -> bool:
+    """
+    Check if two lines match using fuzzy string matching.
+    
+    Args:
+        expected: Expected line content
+        actual: Actual line content  
+        threshold: Similarity threshold (0.0 to 1.0)
+        
+    Returns:
+        True if lines match closely enough
+    """
+    # First try exact match
+    if expected == actual:
+        return True
+    
+    # Try stripping whitespace
+    if expected.strip() == actual.strip():
+        return True
+    
+    # Use rapidfuzz if available for fuzzy matching
+    if RAPIDFUZZ_AVAILABLE and fuzz:
+        similarity = fuzz.ratio(expected.strip(), actual.strip()) / 100.0
+        return similarity >= threshold
+    
+    # Fallback: simple character-based similarity
+    expected_clean = expected.strip()
+    actual_clean = actual.strip()
+    
+    if not expected_clean and not actual_clean:
+        return True
+    if not expected_clean or not actual_clean:
+        return False
+    
+    # Simple Levenshtein-like comparison
+    max_len = max(len(expected_clean), len(actual_clean))
+    min_len = min(len(expected_clean), len(actual_clean))
+    
+    # If length difference is too large, not a match
+    if max_len > min_len * 1.5:
+        return False
+    
+    # Count matching characters in similar positions
+    matches = sum(1 for i in range(min_len) if expected_clean[i] == actual_clean[i])
+    similarity = matches / max_len
+    
+    return similarity >= threshold

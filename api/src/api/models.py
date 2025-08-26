@@ -7,16 +7,8 @@ import uuid
 
 from .db import Base
 
-# Try to import pgvector if available
-try:
-    from pgvector.sqlalchemy import Vector
-    VECTOR_AVAILABLE = True
-except ImportError:
-    VECTOR_AVAILABLE = False
-    # Fallback for when pgvector is not available
-    class Vector:
-        def __init__(self, dim):
-            self.dim = dim
+# Simplified approach without pgvector for now
+VECTOR_AVAILABLE = False
 
 
 class Scene(Base):
@@ -96,13 +88,10 @@ class SceneEmbedding(Base):
     chunk_no = Column(Integer, nullable=False)
     content = Column(Text)
     
-    # Use vector type if available, otherwise store as JSON
-    if VECTOR_AVAILABLE:
-        embedding = Column(Vector(384))  # MiniLM embeddings are 384-dimensional
-    else:
-        embedding = Column(JSON)  # Fallback to JSON storage
+    # Store embeddings as JSON array
+    embedding = Column(JSON)  # JSON storage for embeddings
     
-    meta = Column(JSON if not VECTOR_AVAILABLE else JSONB)
+    meta = Column(JSON)
     
     # Relationships
     scene = relationship("Scene", back_populates="embeddings")

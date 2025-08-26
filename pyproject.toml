@@ -28,6 +28,7 @@ dependencies = [
     "psycopg2-binary>=2.9.10",
     "asyncpg>=0.30.0",
     "chromadb>=1.0.20",
+    "rapidfuzz>=3.13.0",
 ]
 
 [[tool.uv.index]]

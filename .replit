@@ -5,7 +5,7 @@ integrations = ["python_openai==1.0.0"]
 
 [nix]
 channel = "stable-25_05"
-packages = ["glibcLocales", "libxcrypt", "libyaml", "postgresql"]
+packages = ["glibcLocales", "libxcrypt", "libyaml", "postgresql", "rapidfuzz-cpp", "taskflow"]
 
 [workflows]
 runButton = "Project"

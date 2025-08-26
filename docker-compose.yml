@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  chroma:
+    image: chromadb/chroma:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+    command: ["uvicorn", "chromadb.app:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/app
+      - /app/api/.venv
+    environment:
+      - DATABASE_URL=sqlite:///data/app.db
+      - CHROMA_HOST=chroma
+      - CHROMA_PORT=8000
+      - API_PORT=8080
+      - UI_PORT=3000
+      - GIT_USER_NAME=Dev
+      - GIT_USER_EMAIL=dev@example.com
+    env_file:
+      - .env
+    depends_on:
+      - chroma
+    restart: unless-stopped
+
+  ui:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.ui
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app/ui
+      - /app/ui/node_modules
+    environment:
+      - API_BASE=http://localhost:8080
+      - NEXT_TELEMETRY_DISABLED=1
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  chroma-data:
