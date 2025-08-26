@@ -11,6 +11,9 @@ from sqlalchemy.orm import Session
 
 from ..db import get_write_session
 from ..models import Scene
+from ..rag.chroma_client import get_chroma_client
+from ..rag.embeddings import embed_texts
+from ..rag.chunker import chunk_markdown
 
 router = APIRouter(prefix="/ingest", tags=["ingest"])
 
@@ -60,13 +63,18 @@ async def index_files(
     request: IndexRequest,
     db: Session = Depends(get_write_session)
 ) -> IndexResponse:
-    """Index markdown files into the database."""
+    """Index markdown files into the database and ChromaDB."""
     scenes_count = 0
+    chunks_count = 0
+    chroma_client = get_chroma_client()
 
     for path_str in request.paths:
         path = Path(path_str)
         if not path.exists():
             continue
+
+        # Determine collection name based on path
+        collection_name = "codex_docs" if "codex" in path_str else "manuscript_scenes"
 
         # Find all .md files
         md_files = list(path.glob("**/*.md"))
@@ -82,6 +90,7 @@ async def index_files(
 
                 # Extract metadata from frontmatter or filename
                 metadata = post.metadata
+                content = post.content
 
                 # Generate scene ID from filename
                 scene_id = md_file.stem
@@ -96,35 +105,78 @@ async def index_files(
                     chapter = int(match.group(1))
                     order_in_chapter = int(match.group(2))
 
-                # Check if scene already exists
-                existing = db.query(Scene).filter(Scene.id == scene_id).first()
+                # Only create database records for manuscript scenes
+                if "manuscript" in path_str:
+                    # Check if scene already exists
+                    existing = db.query(Scene).filter(Scene.id == scene_id).first()
 
-                if existing and not request.reindex:
-                    continue
+                    if not existing or request.reindex:
+                        # Create or update scene
+                        scene_data = {
+                            'id': scene_id,
+                            'chapter': chapter,
+                            'order_in_chapter': order_in_chapter,
+                            'pov': metadata.get('pov'),
+                            'location': metadata.get('location'),
+                            'text_path': str(md_file.absolute()),
+                            'beats_json': metadata.get('beats', {}),
+                            'links_json': metadata.get('links', {})
+                        }
 
-                # Create or update scene
-                scene_data = {
-                    'id': scene_id,
-                    'chapter': chapter,
-                    'order_in_chapter': order_in_chapter,
-                    'pov': metadata.get('pov'),
-                    'location': metadata.get('location'),
-                    'text_path': str(md_file.absolute()),
-                    'beats_json': metadata.get('beats', {}),
-                    'links_json': metadata.get('links', {})
-                }
+                        if existing:
+                            # Update existing
+                            for key, value in scene_data.items():
+                                if key != 'id':  # Don't update the ID
+                                    setattr(existing, key, value)
+                        else:
+                            # Create new
+                            scene = Scene(**scene_data)
+                            db.add(scene)
 
-                if existing:
-                    # Update existing
-                    for key, value in scene_data.items():
-                        if key != 'id':  # Don't update the ID
-                            setattr(existing, key, value)
-                else:
-                    # Create new
-                    scene = Scene(**scene_data)
-                    db.add(scene)
+                        scenes_count += 1
 
-                scenes_count += 1
+                # Chunk the content for RAG
+                chunks = chunk_markdown(content, max_tokens=800, stride=200)
+                
+                # Process chunks for embeddings
+                if chunks:
+                    chunk_texts = [chunk["text"] for chunk in chunks]
+                    embeddings = embed_texts(chunk_texts)
+                    
+                    # Prepare metadata for ChromaDB
+                    chunk_ids = []
+                    chunk_metadatas = []
+                    
+                    for i, chunk in enumerate(chunks):
+                        chunk_id = f"{scene_id}_chunk_{i}"
+                        chunk_ids.append(chunk_id)
+                        
+                        chunk_metadata = {
+                            "source_path": str(md_file),
+                            "scene_id": scene_id if "manuscript" in path_str else None,
+                            "chapter": chapter if "manuscript" in path_str else None,
+                            "start_line": chunk.get("start_line", 0),
+                            "end_line": chunk.get("end_line", 0),
+                            "token_count": chunk.get("token_count", 0),
+                            "collection_type": collection_name
+                        }
+                        
+                        # Add frontmatter metadata
+                        for key, value in metadata.items():
+                            if key not in chunk_metadata and isinstance(value, (str, int, float, bool)):
+                                chunk_metadata[key] = value
+                        
+                        chunk_metadatas.append(chunk_metadata)
+                    
+                    # Upsert to ChromaDB
+                    chroma_client.upsert(
+                        collection=collection_name,
+                        embeddings=embeddings,
+                        metadatas=chunk_metadatas,
+                        ids=chunk_ids
+                    )
+                    
+                    chunks_count += len(chunks)
 
             except Exception as e:
                 print(f"Error processing {md_file}: {e}")
@@ -134,7 +186,7 @@ async def index_files(
 
     return IndexResponse(
         scenes=scenes_count,
-        chunks=scenes_count,  # For now, assume 1 chunk per scene
+        chunks=chunks_count,
         status="completed"
     )
 

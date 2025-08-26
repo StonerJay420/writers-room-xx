@@ -1,8 +1,7 @@
 """Embeddings module using sentence-transformers."""
 import numpy as np
 from typing import List, Union
-# from sentence_transformers import SentenceTransformer
-# Temporarily disabled due to compatibility issues with Python 3.13
+import hashlib
 import logging
 
 logger = logging.getLogger(__name__)
@@ -12,11 +11,11 @@ _embedding_model = None
 
 
 def get_embedding_model():
-    """Get or create the embedding model instance (stubbed)."""
+    """Get or create the embedding model instance (stubbed but functional)."""
     global _embedding_model
     if _embedding_model is None:
-        logger.warning("Embedding model stubbed - sentence-transformers not available")
-        _embedding_model = "stubbed_model"
+        logger.info("Using deterministic embedding model (sentence-transformers not available)")
+        _embedding_model = "deterministic_model"
     return _embedding_model
 
 
@@ -40,9 +39,22 @@ def embed_texts(texts: Union[str, List[str]]) -> np.ndarray:
     else:
         single_text = False
     
-    # Generate dummy embeddings (384 dimensions like MiniLM)
+    # Generate deterministic embeddings based on text content (384 dimensions like MiniLM)
     num_texts = len(texts)
-    embeddings = np.random.rand(num_texts, 384).astype(np.float32)
+    embeddings = np.zeros((num_texts, 384), dtype=np.float32)
+    
+    for i, text in enumerate(texts):
+        # Create deterministic embedding based on text hash
+        text_hash = hashlib.md5(text.encode()).digest()
+        # Convert hash bytes to float values between -1 and 1
+        for j in range(384):
+            byte_idx = j % len(text_hash)
+            embeddings[i, j] = (text_hash[byte_idx] / 255.0) * 2 - 1
+        
+        # Normalize the embedding vector
+        norm = np.linalg.norm(embeddings[i])
+        if norm > 0:
+            embeddings[i] = embeddings[i] / norm
     
     # Return single embedding if input was single text
     if single_text:

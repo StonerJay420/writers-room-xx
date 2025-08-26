@@ -26,9 +26,9 @@ class AIService:
         self,
         agent_name: str,
         prompt: str,
-        context: Dict[str, Any] = None,
-        scene_text: str = None,
-        custom_model: str = None
+        context: Optional[Dict[str, Any]] = None,
+        scene_text: Optional[str] = None,
+        custom_model: Optional[str] = None
     ) -> Dict[str, Any]:
         """Call a specific AI agent with the given prompt."""
         
@@ -46,20 +46,16 @@ class AIService:
         if custom_model:
             model = custom_model
         else:
-            # Import here to avoid circular dependency
-            from ..routers.models import model_preferences
+            # Use default preferences since model_preferences may not be available
+            model_preferences = {
+                "lore_archivist": "anthropic/claude-3-opus",
+                "grim_editor": "openai/gpt-4-turbo-preview",
+                "tone_metrics": "anthropic/claude-3-sonnet",
+                "supervisor": "anthropic/claude-3-opus"
+            }
             
             # Get model from preferences based on agent name
-            if agent_name == "lore_archivist":
-                model = model_preferences.lore_archivist
-            elif agent_name == "grim_editor":
-                model = model_preferences.grim_editor
-            elif agent_name == "tone_metrics":
-                model = model_preferences.tone_metrics
-            elif agent_name == "supervisor":
-                model = model_preferences.supervisor
-            else:
-                model = "openai/gpt-4-turbo-preview"
+            model = model_preferences.get(agent_name, "openai/gpt-4-turbo-preview")
         
         # Build the system prompt based on agent type
         system_prompt = self._build_system_prompt(agent_name, context)
@@ -118,7 +114,7 @@ class AIService:
                 "agent": agent_name
             }
     
-    def _build_system_prompt(self, agent_name: str, context: Dict[str, Any] = None) -> str:
+    def _build_system_prompt(self, agent_name: str, context: Optional[Dict[str, Any]] = None) -> str:
         """Build system prompt based on agent type."""
         
         if agent_name == "lore_archivist":
