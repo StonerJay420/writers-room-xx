@@ -237,7 +237,7 @@ class AgentService:
         
         # Get agent configuration
         agent_config = self._get_agent_config(agent_name, risk_level)
-        model_id = model_override or agent_config.get("default_model", "anthropic/claude-3-haiku")
+        model_id = model_override or agent_config.get("default_model", "anthropic/claude-sonnet-4-20250514")
         
         # Build prompt
         prompt = self._build_agent_prompt(
@@ -295,25 +295,25 @@ class AgentService:
         base_configs = {
             "lore_archivist": {
                 "role": "Canon consistency checker and lore expert",
-                "default_model": "anthropic/claude-3-sonnet", 
+                "default_model": "anthropic/claude-sonnet-4-20250514", 
                 "max_tokens": 2000,
                 "focus": "character consistency, world-building, canon adherence"
             },
             "grim_editor": {
                 "role": "Line editor focused on prose improvement",
-                "default_model": "anthropic/claude-3-haiku",
+                "default_model": "openai/gpt-5",
                 "max_tokens": 2500,
                 "focus": "grammar, style, flow, clarity, word choice"
             },
             "tone_metrics": {
                 "role": "Writing quality and tone analyzer",
-                "default_model": "openai/gpt-4-turbo-preview", 
+                "default_model": "anthropic/claude-sonnet-4-20250514", 
                 "max_tokens": 1500,
                 "focus": "readability, tone consistency, pacing, voice"
             },
             "supervisor": {
                 "role": "Senior editor providing strategic guidance",
-                "default_model": "anthropic/claude-3-opus",
+                "default_model": "anthropic/claude-sonnet-4-20250514",
                 "max_tokens": 3000,
                 "focus": "story structure, character development, thematic coherence"
             }

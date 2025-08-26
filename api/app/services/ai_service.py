@@ -46,16 +46,16 @@ class AIService:
         if custom_model:
             model = custom_model
         else:
-            # Use default preferences since model_preferences may not be available
+            # Use updated default preferences with latest models
             model_preferences = {
-                "lore_archivist": "anthropic/claude-3-opus",
-                "grim_editor": "openai/gpt-4-turbo-preview",
-                "tone_metrics": "anthropic/claude-3-sonnet",
-                "supervisor": "anthropic/claude-3-opus"
+                "lore_archivist": "anthropic/claude-sonnet-4-20250514",
+                "grim_editor": "openai/gpt-5",
+                "tone_metrics": "anthropic/claude-sonnet-4-20250514",
+                "supervisor": "anthropic/claude-sonnet-4-20250514"
             }
             
             # Get model from preferences based on agent name
-            model = model_preferences.get(agent_name, "openai/gpt-4-turbo-preview")
+            model = model_preferences.get(agent_name, "anthropic/claude-sonnet-4-20250514")
         
         # Build the system prompt based on agent type
         system_prompt = self._build_system_prompt(agent_name, context)
@@ -157,12 +157,40 @@ Provide specific metrics and suggestions for improvement."""
     
     def _calculate_cost(self, model: str, usage: Dict[str, int]) -> float:
         """Calculate cost based on token usage."""
-        # OpenRouter pricing (approximate, per 1M tokens)
+        # Updated pricing for latest models (per 1M tokens)
         pricing = {
-            "anthropic/claude-3-opus": {"input": 15.0, "output": 75.0},
-            "anthropic/claude-3-sonnet": {"input": 3.0, "output": 15.0},
-            "openai/gpt-4-turbo-preview": {"input": 10.0, "output": 30.0},
-            "openai/gpt-3.5-turbo": {"input": 0.5, "output": 1.5}
+            "anthropic/claude-sonnet-4-20250514": {"input": 3.0, "output": 15.0},
+            "anthropic/claude-3-7-sonnet-20250219": {"input": 3.0, "output": 15.0},
+            "anthropic/claude-3-5-sonnet-20241022": {"input": 3.0, "output": 15.0},
+            "anthropic/claude-3-5-haiku-20241022": {"input": 0.8, "output": 4.0},
+            "anthropic/claude-3-opus-20240229": {"input": 15.0, "output": 75.0},
+            "anthropic/claude-3-sonnet-20240229": {"input": 3.0, "output": 15.0},
+            "anthropic/claude-3-haiku-20240307": {"input": 0.25, "output": 1.25},
+            "openai/gpt-5": {"input": 10.0, "output": 30.0},
+            "openai/gpt-4o": {"input": 5.0, "output": 15.0},
+            "openai/gpt-4o-mini": {"input": 0.15, "output": 0.6},
+            "openai/gpt-4-turbo": {"input": 10.0, "output": 30.0},
+            "openai/gpt-4": {"input": 30.0, "output": 60.0},
+            "openai/gpt-3.5-turbo": {"input": 0.5, "output": 1.5},
+            "google/gemini-2.5-flash": {"input": 0.075, "output": 0.3},
+            "google/gemini-2.5-pro": {"input": 1.25, "output": 5.0},
+            "google/gemini-1.5-pro": {"input": 1.25, "output": 5.0},
+            "google/gemini-1.5-flash": {"input": 0.075, "output": 0.3},
+            "google/gemini-pro": {"input": 0.5, "output": 1.5},
+            "xai/grok-2-vision-1212": {"input": 2.0, "output": 10.0},
+            "xai/grok-2-1212": {"input": 2.0, "output": 10.0},
+            "xai/grok-vision-beta": {"input": 2.0, "output": 10.0},
+            "xai/grok-beta": {"input": 2.0, "output": 10.0},
+            "meta-llama/llama-3.3-70b-instruct": {"input": 0.8, "output": 0.8},
+            "meta-llama/llama-3.2-11b-vision-instruct": {"input": 0.18, "output": 0.18},
+            "meta-llama/llama-3.2-90b-vision-instruct": {"input": 0.9, "output": 0.9},
+            "meta-llama/llama-3.1-405b-instruct": {"input": 5.0, "output": 5.0},
+            "meta-llama/llama-3.1-70b-instruct": {"input": 0.8, "output": 0.8},
+            "meta-llama/llama-3.1-8b-instruct": {"input": 0.18, "output": 0.18},
+            "mistralai/mistral-large-2411": {"input": 2.0, "output": 6.0},
+            "mistralai/pixtral-12b-2409": {"input": 0.15, "output": 0.15},
+            "mistralai/mistral-small-2409": {"input": 0.2, "output": 0.6},
+            "mistralai/mistral-nemo-2407": {"input": 0.15, "output": 0.15}
         }
         
         model_pricing = pricing.get(model, {"input": 5.0, "output": 15.0})

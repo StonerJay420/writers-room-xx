@@ -14,10 +14,10 @@ export default function Home() {
   const [scenes, setScenes] = useState<Scene[]>([])
   const [loading, setLoading] = useState(true)
   const [modelPreferences, setModelPreferences] = useState<ModelPreferences>({
-    lore_archivist: 'anthropic/claude-3-opus',
-    grim_editor: 'openai/gpt-4-turbo-preview',
-    tone_metrics: 'anthropic/claude-3-sonnet',
-    supervisor: 'anthropic/claude-3-opus'
+    lore_archivist: 'anthropic/claude-sonnet-4-20250514',
+    grim_editor: 'openai/gpt-5',
+    tone_metrics: 'anthropic/claude-sonnet-4-20250514',
+    supervisor: 'anthropic/claude-sonnet-4-20250514'
   })
   const [processingScene, setProcessingScene] = useState<string | null>(null)
 

@@ -64,7 +64,8 @@ export function AgentSettings({ modelPreferences, onModelChange }: AgentSettings
   const handleSave = async () => {
     setSaveStatus('saving')
     try {
-      // Save model preferences - this will be implemented with actual API
+      // The model changes are already saved individually through handleModelChange
+      // This button now just resets the visual state
       setSaveStatus('saved')
       setHasChanges(false)
       setTimeout(() => setSaveStatus('idle'), 2000)
@@ -77,10 +78,10 @@ export function AgentSettings({ modelPreferences, onModelChange }: AgentSettings
   const handleReset = () => {
     // Reset to defaults
     const defaults = {
-      lore_archivist: 'anthropic/claude-3-opus',
-      grim_editor: 'openai/gpt-4-turbo-preview',
-      tone_metrics: 'anthropic/claude-3-sonnet',
-      supervisor: 'anthropic/claude-3-opus'
+      lore_archivist: 'anthropic/claude-sonnet-4-20250514',
+      grim_editor: 'openai/gpt-5',
+      tone_metrics: 'anthropic/claude-sonnet-4-20250514',
+      supervisor: 'anthropic/claude-sonnet-4-20250514'
     }
     
     Object.entries(defaults).forEach(([agent, model]) => {
