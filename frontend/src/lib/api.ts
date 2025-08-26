@@ -1,6 +1,9 @@
 import { AuthManager } from './auth'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+// Use relative URL in browser to leverage Next.js proxy, absolute URL for server-side
+const API_BASE = typeof window !== 'undefined' 
+  ? '' // Use relative URLs in browser for Next.js proxy
+  : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 class ApiClient {
   private baseURL: string

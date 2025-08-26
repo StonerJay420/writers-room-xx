@@ -57,10 +57,22 @@ export function FileUpload({ onUploadComplete }: FileUploadProps) {
           message: `Uploaded as ${fileType} file`
         })
       } catch (error) {
+        console.error('Upload error for', file.name, ':', error)
+        let errorMessage = 'Upload failed'
+        
+        if (error instanceof Error) {
+          // Extract meaningful error message from API response
+          if (error.message.includes('API Error')) {
+            errorMessage = error.message.replace(/^API Error \d+: /, '')
+          } else {
+            errorMessage = error.message
+          }
+        }
+        
         results.push({
           filename: file.name,
           status: 'error' as const,
-          message: error instanceof Error ? error.message : 'Upload failed'
+          message: errorMessage
         })
       }
     }
