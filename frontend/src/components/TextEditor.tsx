@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
 import { AuthManager } from '@/lib/auth'
-import { Wand2, Check, X, Copy, Save, RefreshCw } from 'lucide-react'
+import { Wand2, Check, X, Copy, Save, RefreshCw, BookOpen, ChevronDown, ChevronUp } from 'lucide-react'
 import { OpenRouterKeySetup } from './OpenRouterKeySetup'
 
 interface AIRecommendation {
@@ -12,7 +12,16 @@ interface AIRecommendation {
   suggestedText: string
   reason: string
   confidence: number
-  type: 'grammar' | 'style' | 'clarity' | 'tone'
+  type: 'grammar' | 'style' | 'clarity' | 'tone' | 'consistency'
+  codexReferences?: string[]
+}
+
+interface CodexEntry {
+  id: string
+  name: string
+  type: string
+  description: string
+  metadata: any
 }
 
 interface TextEditorProps {
@@ -30,6 +39,8 @@ export function TextEditor({ initialText = '', onSave, fileName }: TextEditorPro
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [hasOpenRouterKey, setHasOpenRouterKey] = useState(false)
   const [checkingKey, setCheckingKey] = useState(true)
+  const [codexContext, setCodexContext] = useState<CodexEntry[]>([])
+  const [showCodexContext, setShowCodexContext] = useState(false)
 
   useEffect(() => {
     setHasUnsavedChanges(currentText !== originalText)
@@ -61,11 +72,18 @@ export function TextEditor({ initialText = '', onSave, fileName }: TextEditorPro
 
     setIsLoadingRecommendations(true)
     try {
-      const data = await api.post<{ recommendations?: AIRecommendation[] }>('/ai/recommendations', {
+      const data = await api.post<{ 
+        recommendations?: AIRecommendation[] 
+        codexContext?: CodexEntry[]
+      }>('/ai/recommendations', {
         text: currentText,
         context: 'manuscript_editing'
       })
       setRecommendations(data.recommendations || [])
+      setCodexContext(data.codexContext || [])
+      if (data.codexContext && data.codexContext.length > 0) {
+        setShowCodexContext(true)
+      }
     } catch (error: any) {
       console.error('Failed to get AI recommendations:', error)
       
@@ -128,6 +146,8 @@ export function TextEditor({ initialText = '', onSave, fileName }: TextEditorPro
         return 'border-yellow-400 bg-yellow-50'
       case 'tone':
         return 'border-purple-400 bg-purple-50'
+      case 'consistency':
+        return 'border-orange-400 bg-orange-50'
       default:
         return 'border-gray-400 bg-gray-50'
     }
@@ -232,14 +252,50 @@ export function TextEditor({ initialText = '', onSave, fileName }: TextEditorPro
         </div>
 
         {/* AI Recommendations Panel */}
-        <div className="w-full lg:w-80 h-48 lg:h-full">
+        <div className="w-full lg:w-80 h-48 lg:h-full flex flex-col">
           <div className="px-3 sm:px-4 py-2 bg-dark-surface/50 border-b border-dark-border">
-            <h4 className="text-xs sm:text-sm font-medium text-neon-green">
-              AI Recommendations ({recommendations.length})
-            </h4>
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs sm:text-sm font-medium text-neon-green">
+                AI Recommendations ({recommendations.length})
+              </h4>
+              {codexContext.length > 0 && (
+                <button
+                  onClick={() => setShowCodexContext(!showCodexContext)}
+                  className="flex items-center gap-1 text-xs text-orange-400 hover:text-orange-300"
+                >
+                  <BookOpen size={12} />
+                  <span>Codex ({codexContext.length})</span>
+                  {showCodexContext ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                </button>
+              )}
+            </div>
           </div>
           
-          <div className="h-full overflow-y-auto">
+          {/* Codex Context Panel */}
+          {showCodexContext && codexContext.length > 0 && (
+            <div className="border-b border-dark-border bg-orange-50/5 max-h-32 overflow-y-auto">
+              <div className="p-3 space-y-2">
+                <div className="text-xs font-medium text-orange-400 mb-2">
+                  Referenced World/Character Information:
+                </div>
+                {codexContext.map((entry) => (
+                  <div key={entry.id} className="text-xs">
+                    <span className="font-medium text-orange-300">{entry.name}</span>
+                    <span className="text-gray-400 ml-1">({entry.type})</span>
+                    {entry.description && (
+                      <p className="text-gray-500 mt-1 text-[10px] leading-tight">
+                        {entry.description.length > 80 
+                          ? `${entry.description.substring(0, 80)}...` 
+                          : entry.description}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          <div className="flex-1 overflow-y-auto">
             {recommendations.length === 0 ? (
               <div className="p-4 text-center text-gray-400">
                 <Wand2 size={32} className="mx-auto mb-2 opacity-50" />
@@ -302,6 +358,22 @@ export function TextEditor({ initialText = '', onSave, fileName }: TextEditorPro
                         <span className="text-gray-600 font-medium">Reason:</span>
                         <p className="mt-1 text-gray-600">{rec.reason}</p>
                       </div>
+                      
+                      {rec.codexReferences && rec.codexReferences.length > 0 && (
+                        <div>
+                          <span className="text-orange-600 font-medium">Codex References:</span>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {rec.codexReferences.map((ref, idx) => (
+                              <span
+                                key={idx}
+                                className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-full"
+                              >
+                                {ref}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       
                       <div className="flex justify-between items-center text-xs text-gray-500">
                         <span>Confidence: {Math.round(rec.confidence * 100)}%</span>

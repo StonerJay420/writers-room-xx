@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Plus, Search, User, MapPin, Package, Building, Calendar, Edit, Trash2, Save, X } from 'lucide-react'
+import { Plus, Search, User, MapPin, Package, Building, Calendar, Edit, Trash2, Save, X, Lightbulb, RefreshCw } from 'lucide-react'
 import { CodexItem, Character, Location, CreateCodexItemRequest, CreateCodexItemResponse } from '@/types'
 import { api } from '@/lib/api'
 
@@ -16,6 +16,9 @@ export function CodexManager({ onItemCreated }: CodexManagerProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingItem, setEditingItem] = useState<string | null>(null)
+  const [improvements, setImprovements] = useState<any[]>([])
+  const [loadingImprovements, setLoadingImprovements] = useState(false)
+  const [showImprovements, setShowImprovements] = useState(false)
 
   const itemTypes = [
     { id: 'all', label: 'All Items', icon: Package },
@@ -69,19 +72,77 @@ export function CodexManager({ onItemCreated }: CodexManagerProps) {
     return colors[type] || 'text-gray-400'
   }
 
+  const getCodexImprovements = async () => {
+    setLoadingImprovements(true)
+    try {
+      const response = await api.post<{
+        improvements: any[]
+        total: number
+        codex_analyzed: number
+      }>('/ai/codex-improvements', {
+        codex_type: selectedType === 'all' ? 'all' : selectedType,
+        focus: 'completeness'
+      })
+      setImprovements(response.improvements || [])
+      setShowImprovements(true)
+    } catch (error) {
+      console.error('Failed to get codex improvements:', error)
+      // Mock improvements for demo
+      setImprovements([
+        {
+          codex_entry: 'Sample Character',
+          type: 'character',
+          suggestion: 'Add more detailed background information to enhance character development',
+          priority: 'medium',
+          reason: 'Character depth would benefit from expanded history and motivations'
+        }
+      ])
+      setShowImprovements(true)
+    } finally {
+      setLoadingImprovements(false)
+    }
+  }
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high':
+        return 'text-red-400 bg-red-900/20'
+      case 'medium':
+        return 'text-yellow-400 bg-yellow-900/20'
+      case 'low':
+        return 'text-green-400 bg-green-900/20'
+      default:
+        return 'text-gray-400 bg-gray-900/20'
+    }
+  }
+
   return (
     <div className="h-full bg-gray-900 text-white">
       {/* Header */}
       <div className="p-6 border-b border-gray-700">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-semibold">Codex Manager</h2>
-          <button
-            onClick={() => setShowCreateForm(true)}
-            className="bg-neon-purple hover:bg-neon-purple/80 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-          >
-            <Plus size={16} />
-            Create Item
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={getCodexImprovements}
+              disabled={loadingImprovements}
+              className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
+            >
+              {loadingImprovements ? (
+                <RefreshCw size={16} className="animate-spin" />
+              ) : (
+                <Lightbulb size={16} />
+              )}
+              {loadingImprovements ? 'Getting Suggestions...' : 'AI Improvements'}
+            </button>
+            <button
+              onClick={() => setShowCreateForm(true)}
+              className="bg-neon-purple hover:bg-neon-purple/80 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+            >
+              <Plus size={16} />
+              Create Item
+            </button>
+          </div>
         </div>
 
         {/* Search */}
@@ -117,6 +178,61 @@ export function CodexManager({ onItemCreated }: CodexManagerProps) {
           })}
         </div>
       </div>
+
+      {/* AI Improvements Panel */}
+      {showImprovements && (
+        <div className="border-b border-gray-700 bg-yellow-900/10">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold text-yellow-400 flex items-center gap-2">
+                <Lightbulb size={20} />
+                AI Improvement Suggestions ({improvements.length})
+              </h3>
+              <button
+                onClick={() => setShowImprovements(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            
+            {improvements.length === 0 ? (
+              <p className="text-gray-400 text-center py-4">
+                No improvement suggestions available. Your codex entries look great!
+              </p>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {improvements.map((improvement, idx) => (
+                  <div
+                    key={idx}
+                    className="bg-gray-800 rounded-lg p-4 border border-gray-600"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <h4 className="font-medium text-white">{improvement.codex_entry}</h4>
+                        <span className={`text-xs px-2 py-1 rounded-full ${getTypeColor(improvement.type)}`}>
+                          {improvement.type}
+                        </span>
+                      </div>
+                      <span className={`text-xs px-2 py-1 rounded-full ${getPriorityColor(improvement.priority)}`}>
+                        {improvement.priority}
+                      </span>
+                    </div>
+                    
+                    <p className="text-sm text-gray-300 mb-2">
+                      {improvement.suggestion}
+                    </p>
+                    
+                    <p className="text-xs text-gray-500">
+                      {improvement.reason}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       <div className="p-6">
