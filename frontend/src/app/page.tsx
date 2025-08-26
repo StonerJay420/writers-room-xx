@@ -1,16 +1,19 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { BarChart3, FileText, Settings, Upload, Home as HomeIcon, Library } from 'lucide-react'
+import { BarChart3, FileText, Settings, Upload, Home as HomeIcon, Library, BookOpen, Package } from 'lucide-react'
 import { Tabs } from '@/components/Tabs'
 import { Dashboard } from '@/components/Dashboard'
 import { SceneLibrary } from '@/components/SceneLibrary'
 import { AppSettings } from '@/components/AppSettings'
 import { FileManager } from '@/components/FileManager'
-import { Scene, ModelPreferences } from '@/types'
+import { ManuscriptNavigator } from '@/components/ManuscriptNavigator'
+import { CodexManager } from '@/components/CodexManager'
+import { SceneCreateForm } from '@/components/SceneCreateForm'
+import { Scene, ModelPreferences, CreateSceneResponse } from '@/types'
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState('dashboard')
+  const [activeTab, setActiveTab] = useState('navigator')
   const [scenes, setScenes] = useState<Scene[]>([])
   const [loading, setLoading] = useState(true)
   const [modelPreferences, setModelPreferences] = useState<ModelPreferences>({
@@ -20,6 +23,9 @@ export default function Home() {
     supervisor: 'anthropic/claude-sonnet-4-20250514'
   })
   const [processingScene, setProcessingScene] = useState<string | null>(null)
+  const [showSceneCreateForm, setShowSceneCreateForm] = useState(false)
+  const [selectedScene, setSelectedScene] = useState<Scene | null>(null)
+  const [sceneCreateDefaults, setSceneCreateDefaults] = useState({ chapter: 1, order: 1 })
 
   useEffect(() => {
     loadScenes()
@@ -122,7 +128,31 @@ export default function Home() {
     }
   }
 
+  const handleCreateScene = (chapter: number, order: number) => {
+    setSceneCreateDefaults({ chapter, order })
+    setShowSceneCreateForm(true)
+  }
+
+  const handleSceneCreated = async (scene: CreateSceneResponse) => {
+    await loadScenes()
+    setShowSceneCreateForm(false)
+    // Optionally switch to the scene library to see the new scene
+    setActiveTab('library')
+  }
+
+  const handleSceneSelect = (scene: Scene) => {
+    setSelectedScene(scene)
+    // Navigate to scene detail or show scene content
+    console.log('Selected scene:', scene)
+  }
+
   const tabs = [
+    {
+      id: 'navigator',
+      label: 'Navigator',
+      icon: <BookOpen size={16} />,
+      badge: scenes.length
+    },
     {
       id: 'dashboard',
       label: 'Dashboard',
@@ -133,6 +163,11 @@ export default function Home() {
       label: 'Scene Library',
       icon: <Library size={16} />,
       badge: scenes.length
+    },
+    {
+      id: 'codex',
+      label: 'Codex',
+      icon: <Package size={16} />,
     },
     {
       id: 'settings',
@@ -153,6 +188,63 @@ export default function Home() {
 
   const renderTabContent = () => {
     switch (activeTab) {
+      case 'navigator':
+        return (
+          <div className="h-[800px] flex">
+            <div className="w-80 border-r border-gray-700">
+              <ManuscriptNavigator
+                scenes={scenes}
+                onSceneSelect={handleSceneSelect}
+                onCreateScene={handleCreateScene}
+                selectedSceneId={selectedScene?.id}
+              />
+            </div>
+            <div className="flex-1 p-6">
+              {selectedScene ? (
+                <div className="neon-card rounded-lg p-6">
+                  <h2 className="text-xl font-semibold text-white mb-4">
+                    Scene {selectedScene.id}
+                  </h2>
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <span className="text-gray-400">Chapter:</span>
+                      <span className="ml-2 text-white">{selectedScene.chapter}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Scene:</span>
+                      <span className="ml-2 text-white">{selectedScene.order_in_chapter}</span>
+                    </div>
+                    {selectedScene.pov && (
+                      <div>
+                        <span className="text-gray-400">POV:</span>
+                        <span className="ml-2 text-neon-cyan">{selectedScene.pov}</span>
+                      </div>
+                    )}
+                    {selectedScene.location && (
+                      <div>
+                        <span className="text-gray-400">Location:</span>
+                        <span className="ml-2 text-neon-green">{selectedScene.location}</span>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => processScene(selectedScene.id)}
+                    disabled={processingScene === selectedScene.id}
+                    className="bg-neon-purple hover:bg-neon-purple/80 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+                  >
+                    {processingScene === selectedScene.id ? 'Processing...' : 'Process Scene'}
+                  </button>
+                </div>
+              ) : (
+                <div className="text-center py-20 text-gray-400">
+                  <BookOpen size={64} className="mx-auto mb-4 opacity-50" />
+                  <p className="text-lg mb-2">Select a scene to view details</p>
+                  <p className="text-sm">Or create a new scene using the navigator</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )
       case 'dashboard':
         return (
           <Dashboard
@@ -168,6 +260,15 @@ export default function Home() {
             onProcessScene={processScene}
             processingScene={processingScene}
             loading={loading}
+          />
+        )
+      case 'codex':
+        return (
+          <CodexManager
+            onItemCreated={(item) => {
+              console.log('Created codex item:', item)
+              // Optionally trigger indexing or other actions
+            }}
           />
         )
       case 'settings':
@@ -232,6 +333,15 @@ export default function Home() {
           </div>
         </div>
       </div>
+      
+      {/* Scene Creation Modal */}
+      <SceneCreateForm
+        isOpen={showSceneCreateForm}
+        onClose={() => setShowSceneCreateForm(false)}
+        onSceneCreated={handleSceneCreated}
+        defaultChapter={sceneCreateDefaults.chapter}
+        defaultOrder={sceneCreateDefaults.order}
+      />
     </div>
   )
 }

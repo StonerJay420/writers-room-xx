@@ -111,3 +111,105 @@ export interface Job {
   created_at: string
   updated_at: string
 }
+
+// Codex item types
+export interface CodexItem {
+  id: string
+  name: string
+  type: string
+  description?: string
+  tags?: string[]
+  metadata?: Record<string, any>
+  created_at?: string
+  updated_at?: string
+}
+
+export interface Character {
+  id: string
+  name: string
+  age?: number
+  occupation?: string
+  personality?: string
+  background?: string
+  voice?: string
+  arc?: string
+  appearance?: string
+  relationships?: Record<string, string>
+  tags?: string[]
+  notes?: string
+}
+
+export interface Location {
+  id: string
+  name: string
+  type?: string
+  description?: string
+  atmosphere?: string
+  significance?: string
+  connected_locations?: string[]
+  tags?: string[]
+  notes?: string
+}
+
+export interface CreateCodexItemRequest {
+  name: string
+  type: string
+  data: Record<string, any>
+}
+
+export interface CreateCodexItemResponse {
+  id: string
+  name: string
+  type: string
+  path: string
+  status: string
+}
+
+// Scene creation types
+export interface CreateSceneRequest {
+  chapter: number
+  order_in_chapter: number
+  title?: string
+  pov?: string
+  location?: string
+  beats?: string[]
+  content: string
+  links?: Record<string, any>
+}
+
+export interface CreateSceneResponse {
+  id: string
+  chapter: number
+  order_in_chapter: number
+  path: string
+  status: string
+}
+
+// Navigation and hierarchy types
+export interface Act {
+  id: number
+  title: string
+  description?: string
+  chapters: Chapter[]
+}
+
+export interface Chapter {
+  id: number
+  act_id: number
+  title: string
+  description?: string
+  scenes: Scene[]
+}
+
+export interface SceneNode extends Scene {
+  title?: string
+  description?: string
+}
+
+export interface NavigationState {
+  selectedAct?: number
+  selectedChapter?: number
+  selectedScene?: string
+  expandedActs: Set<number>
+  expandedChapters: Set<number>
+}

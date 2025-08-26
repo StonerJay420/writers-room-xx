@@ -125,6 +125,7 @@ from .routers.auth import router as auth_router
 from .routers.jobs import router as jobs_router
 from .routers.ingest import router as ingest_router
 from .routers.scenes import router as scenes_router
+from .routers.codex import router as codex_router
 from .routers.models import router as models_router
 from .routers.patches import router as patches_router
 from .routers.diff import router as diff_router
@@ -144,6 +145,7 @@ app.include_router(protected_router, prefix="/api")
 # Core functionality endpoints (require auth)
 app.include_router(ingest_router, prefix="/api")
 app.include_router(scenes_router, prefix="/api")
+app.include_router(codex_router, prefix="/api")
 app.include_router(models_router, prefix="/api")
 app.include_router(patches_router, prefix="/api")
 app.include_router(diff_router, prefix="/api")

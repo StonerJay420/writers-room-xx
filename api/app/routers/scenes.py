@@ -4,6 +4,8 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 from pathlib import Path
+import yaml
+import re
 
 router = APIRouter(prefix="/scenes", tags=["scenes"])
 
@@ -17,6 +19,27 @@ class SceneMetadata(BaseModel):
     location: Optional[str] = None
     beats_json: Optional[Dict[str, Any]] = None
     links_json: Optional[Dict[str, Any]] = None
+
+
+class CreateSceneRequest(BaseModel):
+    """Request model for creating a new scene."""
+    chapter: int
+    order_in_chapter: int
+    title: Optional[str] = None
+    pov: Optional[str] = None
+    location: Optional[str] = None
+    beats: Optional[List[str]] = None
+    content: str = ""
+    links: Optional[Dict[str, Any]] = None
+
+
+class CreateSceneResponse(BaseModel):
+    """Response model for scene creation."""
+    id: str
+    chapter: int
+    order_in_chapter: int
+    path: str
+    status: str
 
 
 @router.get("", response_model=List[SceneMetadata])
@@ -92,3 +115,57 @@ async def get_scene(scene_id: str):
         "text": text,
         "path": str(scene_path)
     }
+
+
+@router.post("", response_model=CreateSceneResponse)
+async def create_scene(request: CreateSceneRequest):
+    """Create a new scene with the specified metadata and content."""
+    # Generate scene ID
+    scene_id = f"ch{request.chapter:02d}_s{request.order_in_chapter:02d}"
+    
+    # Create data/manuscript directory if it doesn't exist
+    manuscript_dir = Path("data/manuscript")
+    manuscript_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Check if scene already exists
+    scene_path = manuscript_dir / f"{scene_id}.md"
+    if scene_path.exists():
+        raise HTTPException(status_code=409, detail=f"Scene {scene_id} already exists")
+    
+    # Prepare frontmatter
+    frontmatter: Dict[str, Any] = {
+        "chapter": request.chapter,
+        "scene": request.order_in_chapter,
+    }
+    
+    if request.pov:
+        frontmatter["pov"] = request.pov
+    if request.location:
+        frontmatter["location"] = request.location
+    if request.beats:
+        frontmatter["beats"] = request.beats
+    if request.links:
+        frontmatter["links"] = request.links
+    
+    # Create markdown content with YAML frontmatter
+    content_lines = ["---"]
+    content_lines.append(yaml.dump(frontmatter, default_flow_style=False).strip())
+    content_lines.append("---")
+    
+    if request.title:
+        content_lines.append(f"\n# {request.title}\n")
+    
+    content_lines.append(request.content)
+    
+    full_content = "\n".join(content_lines)
+    
+    # Write the file
+    scene_path.write_text(full_content, encoding='utf-8')
+    
+    return CreateSceneResponse(
+        id=scene_id,
+        chapter=request.chapter,
+        order_in_chapter=request.order_in_chapter,
+        path=str(scene_path),
+        status="created"
+    )
