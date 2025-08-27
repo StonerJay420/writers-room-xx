@@ -16,7 +16,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="bg-dark-bg min-h-screen">
         <ThemeProvider>
-          <header className="bg-dark-surface/90 backdrop-blur-md border-b border-neon-purple/20 shadow-lg relative z-10">
+          <header className="bg-dark-surface/90 backdrop-blur-md border-b border-neon-purple/20 shadow-lg relative z-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex justify-between items-center py-4">
                 <div className="flex items-center space-x-4">
@@ -38,7 +38,7 @@ export default function RootLayout({
               </div>
             </div>
           </header>
-          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-40">
             {children}
           </main>
         </ThemeProvider>

@@ -332,99 +332,100 @@ body{
     position: relative;
     overflow-x: hidden;
 }
-/* Neon Jellyfish Animation */
+/* Neon Electrical Flicker Animation */
 body::before {
     content: '';
     position: fixed;
-    top: 0;
+    top: -100%;
     left: 0;
     width: 100%;
-    height: 100%;
+    height: 200%;
     pointer-events: none;
-    z-index: 1;
+    z-index: -1;
     background: 
-      radial-gradient(ellipse 200px 300px at var(--jellyfish-x, 20%) var(--jellyfish-y, 30%), 
-        rgba(var(--neon-cyan), 0.15) 0%, 
-        rgba(var(--neon-cyan), 0.08) 30%, 
-        rgba(var(--neon-purple), 0.05) 50%, 
-        transparent 70%),
-      radial-gradient(ellipse 150px 250px at var(--jellyfish2-x, 80%) var(--jellyfish2-y, 70%), 
-        rgba(var(--neon-pink), 0.12) 0%, 
-        rgba(var(--neon-pink), 0.06) 30%, 
-        rgba(var(--neon-blue), 0.04) 50%, 
-        transparent 70%);
-    animation: jellyfish-float 20s ease-in-out infinite;
+      linear-gradient(180deg,
+        transparent 0%,
+        rgba(var(--neon-cyan), 0.15) 10%,
+        rgba(var(--neon-cyan), 0.25) 15%,
+        rgba(var(--neon-cyan), 0.15) 20%,
+        transparent 25%,
+        transparent 35%,
+        rgba(var(--neon-purple), 0.2) 40%,
+        rgba(var(--neon-purple), 0.3) 42%,
+        rgba(var(--neon-purple), 0.2) 44%,
+        transparent 50%,
+        transparent 60%,
+        rgba(var(--neon-pink), 0.18) 65%,
+        rgba(var(--neon-pink), 0.28) 67%,
+        rgba(var(--neon-pink), 0.18) 69%,
+        transparent 75%,
+        transparent 85%,
+        rgba(var(--neon-green), 0.16) 90%,
+        rgba(var(--neon-green), 0.26) 92%,
+        rgba(var(--neon-green), 0.16) 94%,
+        transparent 100%);
+    animation: electrical-flicker 6s linear infinite;
   }
-@keyframes jellyfish-float {
-    0% {
-      --jellyfish-x: 20%;
-      --jellyfish-y: 30%;
-      --jellyfish2-x: 80%;
-      --jellyfish2-y: 70%;
-    }
-    25% {
-      --jellyfish-x: 60%;
-      --jellyfish-y: 20%;
-      --jellyfish2-x: 40%;
-      --jellyfish2-y: 80%;
-    }
-    50% {
-      --jellyfish-x: 85%;
-      --jellyfish-y: 60%;
-      --jellyfish2-x: 15%;
-      --jellyfish2-y: 40%;
-    }
-    75% {
-      --jellyfish-x: 40%;
-      --jellyfish-y: 80%;
-      --jellyfish2-x: 70%;
-      --jellyfish2-y: 20%;
-    }
-    100% {
-      --jellyfish-x: 20%;
-      --jellyfish-y: 30%;
-      --jellyfish2-x: 80%;
-      --jellyfish2-y: 70%;
-    }
-  }
-/* Additional Jellyfish Elements */
 body::after {
     content: '';
     position: fixed;
-    top: 0;
+    top: -100%;
     left: 0;
     width: 100%;
-    height: 100%;
+    height: 200%;
     pointer-events: none;
-    z-index: 2;
+    z-index: -2;
     background: 
-      radial-gradient(ellipse 100px 150px at var(--jellyfish3-x, 50%) var(--jellyfish3-y, 60%), 
-        rgba(var(--neon-green), 0.1) 0%, 
-        rgba(var(--neon-green), 0.05) 40%, 
-        transparent 60%),
-      linear-gradient(180deg, 
-        transparent 0%, 
-        rgba(var(--neon-cyan), 0.02) 30%, 
-        rgba(var(--neon-pink), 0.02) 70%, 
-        transparent 100%);
-    animation: jellyfish-tentacles 15s ease-in-out infinite;
+      linear-gradient(180deg,
+        transparent 0%,
+        transparent 15%,
+        rgba(var(--neon-blue), 0.1) 25%,
+        rgba(var(--neon-blue), 0.2) 27%,
+        rgba(var(--neon-blue), 0.1) 29%,
+        transparent 35%,
+        transparent 50%,
+        rgba(var(--neon-yellow), 0.12) 60%,
+        rgba(var(--neon-yellow), 0.22) 62%,
+        rgba(var(--neon-yellow), 0.12) 64%,
+        transparent 70%,
+        transparent 80%,
+        rgba(var(--neon-cyan), 0.14) 85%,
+        rgba(var(--neon-cyan), 0.24) 87%,
+        rgba(var(--neon-cyan), 0.14) 89%,
+        transparent 95%);
+    animation: electrical-flicker-2 8s linear infinite;
+    opacity: 0.6;
   }
-@keyframes jellyfish-tentacles {
+@keyframes electrical-flicker {
     0% {
-      --jellyfish3-x: 50%;
-      --jellyfish3-y: 60%;
+      transform: translateY(0%);
+      opacity: 1;
     }
-    33% {
-      --jellyfish3-x: 30%;
-      --jellyfish3-y: 40%;
-    }
-    66% {
-      --jellyfish3-x: 70%;
-      --jellyfish3-y: 80%;
+    50% {
+      opacity: 0.8;
     }
     100% {
-      --jellyfish3-x: 50%;
-      --jellyfish3-y: 60%;
+      transform: translateY(100%);
+      opacity: 1;
+    }
+  }
+@keyframes electrical-flicker-2 {
+    0% {
+      transform: translateY(0%);
+      opacity: 0.7;
+    }
+    25% {
+      opacity: 0.9;
+    }
+    50% {
+      opacity: 0.5;
+    }
+    75% {
+      opacity: 0.8;
+    }
+    100% {
+      transform: translateY(100%);
+      opacity: 0.7;
     }
   }
 *, ::before, ::after{
@@ -737,6 +738,9 @@ body::after {
 }
 .z-10{
   z-index: 10;
+}
+.z-40{
+  z-index: 40;
 }
 .z-50{
   z-index: 50;
